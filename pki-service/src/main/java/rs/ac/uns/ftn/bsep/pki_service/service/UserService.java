@@ -9,6 +9,8 @@ import rs.ac.uns.ftn.bsep.pki_service.model.VerificationToken;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
 import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.VerificationTokenRepository;
+import com.nulabinc.zxcvbn.Strength;
+import com.nulabinc.zxcvbn.Zxcvbn;
 
 import java.util.UUID;
 
@@ -18,6 +20,8 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenRepository tokenRepository;
     private final EmailService emailService;
+
+    private final Zxcvbn zxcvbn = new Zxcvbn();
 
     @Autowired
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
@@ -35,6 +39,12 @@ public class UserService {
 
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email is already in use.");
+        }
+
+        Strength strength = zxcvbn.measure(dto.getPassword());
+        if (strength.getScore() < 2) {
+            String feedback = "Password is too weak. " + strength.getFeedback().getWarning();
+            throw new IllegalArgumentException(feedback.isEmpty() ? "Password is too weak." : feedback);
         }
 
         User newUser = new User();
