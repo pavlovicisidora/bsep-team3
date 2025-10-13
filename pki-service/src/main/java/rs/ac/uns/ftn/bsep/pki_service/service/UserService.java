@@ -1,8 +1,13 @@
 package rs.ac.uns.ftn.bsep.pki_service.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import rs.ac.uns.ftn.bsep.pki_service.dto.LoginRequestDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.LoginResponseDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.UserRegistrationRequestDto;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
 import rs.ac.uns.ftn.bsep.pki_service.model.VerificationToken;
@@ -11,6 +16,7 @@ import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.VerificationTokenRepository;
 import com.nulabinc.zxcvbn.Strength;
 import com.nulabinc.zxcvbn.Zxcvbn;
+import rs.ac.uns.ftn.bsep.pki_service.util.JwtUtil;
 
 import java.util.UUID;
 
@@ -20,16 +26,26 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final VerificationTokenRepository tokenRepository;
     private final EmailService emailService;
+    private final RecaptchaService recaptchaService;
+    private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil;
+    private final CustomUserDetailsService customUserDetailsService;
 
     private final Zxcvbn zxcvbn = new Zxcvbn();
 
     @Autowired
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                       VerificationTokenRepository tokenRepository, EmailService emailService) {
+                       VerificationTokenRepository tokenRepository, EmailService emailService,
+                       RecaptchaService recaptchaService, AuthenticationManager authenticationManager,
+                       JwtUtil jwtUtil, CustomUserDetailsService customUserDetailsService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenRepository = tokenRepository;
         this.emailService = emailService;
+        this.recaptchaService = recaptchaService;
+        this.authenticationManager = authenticationManager;
+        this.jwtUtil = jwtUtil;
+        this.customUserDetailsService = customUserDetailsService;
     }
 
     public User registerOrdinaryUser(UserRegistrationRequestDto dto) {
@@ -80,5 +96,23 @@ public class UserService {
         userRepository.save(user);
 
         tokenRepository.delete(verificationToken);
+    }
+
+    public LoginResponseDto login(LoginRequestDto dto) {
+        if (!recaptchaService.validateToken(dto.getRecaptchaToken())) {
+            throw new IllegalArgumentException("reCAPTCHA validation failed.");
+        }
+
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+        );
+
+        final UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(dto.getEmail());
+
+        User user = (User) userDetails;
+
+        final String token = jwtUtil.generateToken(user);
+
+        return new LoginResponseDto(token);
     }
 }

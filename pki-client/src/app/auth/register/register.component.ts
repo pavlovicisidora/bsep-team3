@@ -2,7 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ZXCVBNResult } from 'zxcvbn';
 import { AuthService } from '../auth.service';
-import * as zxcvbn from 'zxcvbn';
+import zxcvbn from 'zxcvbn';
+import { Router } from '@angular/router'; 
 
 export function passwordMatchValidator(group: FormGroup) {
   const password = group.get('password')?.value;
@@ -23,7 +24,8 @@ export class RegisterComponent implements OnInit {
   successMessage = '';
   errorMessage = '';
 
-  constructor(private fb: FormBuilder, private authService: AuthService) {}
+  constructor(private fb: FormBuilder, private authService: AuthService, private router: Router) {}
+
 
   ngOnInit(): void {
     this.registerForm = this.fb.group({
@@ -65,8 +67,9 @@ export class RegisterComponent implements OnInit {
     this.authService.register(registrationData).subscribe({
       next: (response) => {
         this.isLoading = false;
-        this.successMessage = 'Registration successful. Please check your email to activate your account.';
-        this.registerForm.reset();
+        this.router.navigate(['/login'], { 
+          state: { message: 'Registration successful! Please check your email for the activation link.' } 
+        });
       },
       error: (err) => {
         this.isLoading = false;
