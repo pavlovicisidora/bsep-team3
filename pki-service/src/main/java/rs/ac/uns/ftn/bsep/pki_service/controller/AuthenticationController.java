@@ -4,6 +4,8 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import rs.ac.uns.ftn.bsep.pki_service.dto.LoginRequestDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.LoginResponseDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.UserRegistrationRequestDto;
 import rs.ac.uns.ftn.bsep.pki_service.service.UserService;
 
@@ -27,5 +29,11 @@ public class AuthenticationController {
     public ResponseEntity<String> activateAccount(@RequestParam("token") String token) {
         userService.activateUser(token);
         return ResponseEntity.ok("Account activated successfully!");
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto loginDto) {
+        LoginResponseDto response = userService.login(loginDto);
+        return ResponseEntity.ok(response);
     }
 }
