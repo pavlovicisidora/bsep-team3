@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.Map;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import rs.ac.uns.ftn.bsep.pki_service.model.User;
 
 import javax.crypto.SecretKey;
 
@@ -30,11 +31,14 @@ public class JwtUtil {
         byte[] keyBytes = Base64.getDecoder().decode(this.secret);
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
     }
-    public String generateToken(UserDetails userDetails) {
+    public String generateToken(User user) {
         Map<String, Object> claims = new HashMap<>();
+        claims.put("firstName", user.getFirstName());
+        claims.put("lastName", user.getLastName());
+        claims.put("role", user.getRole().name());
         return Jwts.builder()
                 .setClaims(claims)
-                .setSubject(userDetails.getUsername())
+                .setSubject(user.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(this.secretKey, SignatureAlgorithm.HS512)

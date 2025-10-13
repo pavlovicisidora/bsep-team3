@@ -1,0 +1,51 @@
+<div class="login-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Login</mat-card-title>
+    </mat-card-header>
+    
+    <mat-card-content>
+
+      <div *ngIf="registrationSuccessMessage" class="alert alert-success">
+        {{ registrationSuccessMessage }}
+      </div>
+
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+        <mat-form-field appearance="outline">
+          <mat-label>Email</mat-label>
+          <input matInput type="email" formControlName="email" required>
+          <mat-error *ngIf="loginForm.get('email')?.touched && loginForm.get('email')?.invalid">Please enter a valid email.</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Password</mat-label>
+          <input matInput type="password" formControlName="password" required>
+          <mat-error *ngIf="loginForm.get('password')?.touched && loginForm.get('password')?.invalid">Password is required.</mat-error>
+        </mat-form-field>
+
+        <div class="recaptcha-container">
+          <ngx-recaptcha2 
+            #captchaElem 
+            [siteKey]="recaptchaSiteKey" 
+            formControlName="recaptchaToken">
+          </ngx-recaptcha2>
+          <mat-error *ngIf="loginForm.get('recaptchaToken')?.touched && loginForm.get('recaptchaToken')?.invalid">
+            Please complete the reCAPTCHA.
+          </mat-error>
+        </div>
+
+        <div *ngIf="isLoading" class="spinner-container">
+          <mat-spinner diameter="30"></mat-spinner>
+        </div>
+        
+        <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+
+        <button mat-raised-button color="primary" type="submit" [disabled]="isLoading || loginForm.invalid">Login</button>
+      </form>
+    </mat-card-content>
+    
+    <mat-card-actions align="end">
+      <a mat-button routerLink="/register">Don't have an account? Register</a>
+    </mat-card-actions>
+  </mat-card>
+</div>

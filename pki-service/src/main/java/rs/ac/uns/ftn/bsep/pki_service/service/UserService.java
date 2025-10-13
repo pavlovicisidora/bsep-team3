@@ -4,8 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import rs.ac.uns.ftn.bsep.pki_service.dto.LoginRequestDto;
@@ -101,9 +99,9 @@ public class UserService {
     }
 
     public LoginResponseDto login(LoginRequestDto dto) {
-        /*if (!recaptchaService.validateToken(dto.getRecaptchaToken())) {
+        if (!recaptchaService.validateToken(dto.getRecaptchaToken())) {
             throw new IllegalArgumentException("reCAPTCHA validation failed.");
-        }*/
+        }
 
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
@@ -111,7 +109,9 @@ public class UserService {
 
         final UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(dto.getEmail());
 
-        final String token = jwtUtil.generateToken(userDetails);
+        User user = (User) userDetails;
+
+        final String token = jwtUtil.generateToken(user);
 
         return new LoginResponseDto(token);
     }
