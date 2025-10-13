@@ -30,6 +30,6 @@ build/
 !**/src/test/**/build/
 
 .env
-*.application-dev.properties
+application-dev.properties
 ### VS Code ###
 .vscode/
