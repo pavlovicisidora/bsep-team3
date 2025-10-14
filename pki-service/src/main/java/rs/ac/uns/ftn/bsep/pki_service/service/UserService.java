@@ -100,11 +100,11 @@ public class UserService {
 
     public LoginResponseDto login(LoginRequestDto dto) {
         if (!recaptchaService.validateToken(dto.getRecaptchaToken())) {
-            throw new IllegalArgumentException("reCAPTCHA validation failed.");
+           throw new IllegalArgumentException("reCAPTCHA validation failed.");
         }
 
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+              new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
         );
 
         final UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(dto.getEmail());
