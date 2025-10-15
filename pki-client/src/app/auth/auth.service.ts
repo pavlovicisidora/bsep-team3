@@ -1,9 +1,15 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../environment';
 import { Router } from '@angular/router';
 import { jwtDecode } from 'jwt-decode';
+
+export interface ResetPasswordPayload {
+  token: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -66,5 +72,20 @@ export class AuthService {
     localStorage.removeItem(this.tokenKey);
     this.currentUserSubject.next(null); 
     this.router.navigate(['/login']);
+  }
+
+  forgotPassword(email: string): Observable<string> {
+    
+    const params = new HttpParams().set('email', email);
+
+    
+    const url = `${this.apiUrl}/api/auth/forgot-password`;
+
+    return this.http.post(url, null, { params, responseType: 'text' });
+  }
+
+   resetPassword(payload: ResetPasswordPayload): Observable<string> {
+    const url = `${this.apiUrl}/api/auth/reset-password`;
+    return this.http.post(url, payload, { responseType: 'text' });
   }
 }

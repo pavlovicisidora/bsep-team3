@@ -3,6 +3,9 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from 'src/app/environment';
 import { AuthService } from '../auth.service';
+import { ForgotPasswordDialogComponent } from '../forgot-password-dialog/forgot-password-dialog.component';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-login',
@@ -20,7 +23,9 @@ export class LoginComponent implements OnInit {
   constructor(
     private fb: FormBuilder,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    public dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) {
     const navigation = this.router.getCurrentNavigation();
     this.registrationSuccessMessage = navigation?.extras?.state?.['message'];
@@ -53,5 +58,41 @@ export class LoginComponent implements OnInit {
         this.loginForm.get('recaptchaToken')?.reset();
       }
     });
+  }
+
+   openForgotPasswordDialog(): void {
+    const dialogRef = this.dialog.open(ForgotPasswordDialogComponent, {
+      width: '400px',
+      data: { email: '' } 
+    });
+
+   dialogRef.afterClosed().subscribe(email => {
+  // Proveravamo da li je korisnik uneo email (nije kliknuo 'Cancel')
+  if (email) {
+    this.isLoading = true; // Pokaži spinner dok čekamo odgovor
+    
+    // Pozivamo metodu iz servisa
+    this.authService.forgotPassword(email).subscribe({
+      next: (response) => {
+        this.isLoading = false; // Sakrij spinner
+        // Prikazujemo poruku o uspehu
+        // Korišćenje snackbar-a je elegantnije od alert-a
+        this.snackBar.open(response, 'Close', {
+          duration: 5000, // Poruka traje 5 sekundi
+          panelClass: ['success-snackbar'] // Opciono, za stilizovanje
+        });
+      },
+      error: (err) => {
+        this.isLoading = false; // Sakrij spinner
+        console.error('Error sending password reset link:', err);
+        // Prikazujemo generičku poruku o grešci
+        this.snackBar.open('An error occurred. Please try again later.', 'Close', {
+          duration: 5000,
+          panelClass: ['error-snackbar'] // Opciono, za stilizovanje
+        });
+      }
+    });
+  }
+});
   }
 }
