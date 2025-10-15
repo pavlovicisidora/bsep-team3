@@ -6,9 +6,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import rs.ac.uns.ftn.bsep.pki_service.dto.LoginRequestDto;
-import rs.ac.uns.ftn.bsep.pki_service.dto.LoginResponseDto;
-import rs.ac.uns.ftn.bsep.pki_service.dto.UserRegistrationRequestDto;
+import org.apache.commons.lang3.RandomStringUtils;
+import rs.ac.uns.ftn.bsep.pki_service.dto.*;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
 import rs.ac.uns.ftn.bsep.pki_service.model.VerificationToken;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
@@ -87,13 +86,30 @@ public class UserService {
         return savedUser;
     }
 
-    /*
-    Ovo cemo morati da uraidmo kada dodajemo CA korisnika, isto kao gore samo dodamo ovo, za AMDINA mozemo to i online
+    public void createCaUser(CaUserCreateRequestDto dto) {
+        if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Email is already in use.");
+        }
 
-    if (newUser.getRole() == Role.CA_USER) { // Prilagodite ovo vašem sistemu rola
+        String rawPassword = RandomStringUtils.randomAlphanumeric(12);
+
+        User newUser = new User();
+        newUser.setEmail(dto.getEmail());
+        newUser.setPassword(passwordEncoder.encode(rawPassword));
+        newUser.setFirstName(dto.getFirstName());
+        newUser.setLastName(dto.getLastName());
+        newUser.setOrganization(dto.getOrganization());
+        newUser.setRole(UserRole.CA_USER);
+        newUser.setVerified(true);
+        newUser.setPasswordChangeRequired(true);
+
         String symmetricKey = generateUserSymmetricKey();
         newUser.setUserSymmetricKey(symmetricKey);
-    }*/
+
+        userRepository.save(newUser);
+
+        emailService.sendCaUserCredentials(newUser.getEmail(), rawPassword);
+    }
 
     private String generateUserSymmetricKey() {
         try {
@@ -141,6 +157,30 @@ public class UserService {
 
         final String token = jwtUtil.generateToken(user);
 
-        return new LoginResponseDto(token);
+        return new LoginResponseDto(token, user.isPasswordChangeRequired());
+    }
+
+    public void caUserChangePassword(String userEmail, CaUserPasswordChangeRequestDto dto) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found!"));
+
+        if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Incorrect current password.");
+        }
+
+        if (!dto.getNewPassword().equals(dto.getConfirmNewPassword())) {
+            throw new IllegalArgumentException("New passwords do not match.");
+        }
+
+        Strength strength = zxcvbn.measure(dto.getNewPassword());
+        if (strength.getScore() < 2) {
+            throw new IllegalArgumentException("New password is too weak.");
+        }
+
+        user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+
+        user.setPasswordChangeRequired(false);
+
+        userRepository.save(user);
     }
 }

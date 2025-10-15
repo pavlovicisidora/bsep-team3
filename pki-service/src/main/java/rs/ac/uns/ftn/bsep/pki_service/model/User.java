@@ -44,6 +44,9 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean isVerified = false;
 
+    @Column(nullable = false)
+    private boolean passwordChangeRequired = false;
+
     @Column(name = "symmetric_key", columnDefinition = "TEXT")
     private String userSymmetricKey;
 

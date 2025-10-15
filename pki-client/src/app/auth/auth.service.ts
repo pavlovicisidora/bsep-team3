@@ -5,6 +5,11 @@ import { environment } from '../environment';
 import { Router } from '@angular/router';
 import { jwtDecode } from 'jwt-decode';
 
+interface LoginResponse {
+  jwt: string;
+  passwordChangeRequired: boolean;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -14,6 +19,9 @@ export class AuthService {
 
   private currentUserSubject = new BehaviorSubject<any>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
+
+  private passwordChangeRequiredSubject = new BehaviorSubject<boolean>(false);
+  public isPasswordChangeRequired$ = this.passwordChangeRequiredSubject.asObservable();
 
   constructor(private http: HttpClient, private router: Router) {
     this.loadUserFromToken();
@@ -36,12 +44,22 @@ export class AuthService {
     return this.currentUserSubject.value;
   }
 
-  login(credentials: any): Observable<{jwt: string}> {
-    return this.http.post<{jwt: string}>(`${this.apiUrl}/api/auth/login`, credentials).pipe(
+  login(credentials: any): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.apiUrl}/api/auth/login`, credentials).pipe(
       tap(response => {
         this.saveToken(response.jwt);
         const decodedUser = jwtDecode(response.jwt);
         this.currentUserSubject.next(decodedUser);
+        
+        this.passwordChangeRequiredSubject.next(response.passwordChangeRequired);
+      })
+    );
+  }
+
+  caUserChangePassword(passwords: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/api/user/change-password`, passwords, { responseType: 'text' }).pipe(
+      tap(() => {
+        this.passwordChangeRequiredSubject.next(false);
       })
     );
   }
@@ -65,6 +83,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(this.tokenKey);
     this.currentUserSubject.next(null); 
+    this.passwordChangeRequiredSubject.next(false);
     this.router.navigate(['/login']);
   }
 }

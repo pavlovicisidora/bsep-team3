@@ -20,13 +20,20 @@ import { NgxCaptchaModule } from 'ngx-captcha';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { MatToolbarModule } from '@angular/material/toolbar'; 
 import { MatIconModule } from '@angular/material/icon';
+import { ForcePasswordChangeComponent } from './auth/force-password-change/force-password-change.component';
+import { NavbarComponent } from './navbar/navbar.component';
+import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.component';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 @NgModule({
   declarations: [
     AppComponent,
     RegisterComponent,
     LoginComponent,
-    DashboardComponent
+    DashboardComponent,
+    ForcePasswordChangeComponent,
+    NavbarComponent,
+    CreateCaUserComponent
   ],
   imports: [
     BrowserModule,
@@ -42,6 +49,7 @@ import { MatIconModule } from '@angular/material/icon';
     MatProgressSpinnerModule,
     MatToolbarModule,
     MatIconModule,
+    MatSnackBarModule,
     HttpClientModule
   ],
   providers: [
