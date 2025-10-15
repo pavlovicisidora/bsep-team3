@@ -1,0 +1,32 @@
+<mat-toolbar color="primary">
+  <a mat-button routerLink="/dashboard">
+    <mat-icon>home</mat-icon> PKI Service
+  </a>
+
+  <ng-container *ngIf="isAdmin$ | async">
+    <!-- stranice za admina -->
+    <a mat-button routerLink="/create-ca-user">
+      <mat-icon>person_add</mat-icon> Create CA User
+    </a>
+  </ng-container>
+
+  <ng-container *ngIf="isCaUser$ | async">
+    <!-- stranice za ca korisnika -->
+  </ng-container>
+
+  <ng-container *ngIf="isOrdinaryUser$ | async">
+     <!-- stranice za obicnog korisnika -->
+  </ng-container>
+
+  <span class="spacer"></span>
+
+  <ng-container *ngIf="isLoggedIn$ | async">
+    <span *ngIf="authService.currentUser$ | async as user" class="user-info">
+      {{ user.firstName }} ({{ user.role }})
+    </span>
+    <button mat-icon-button (click)="logout()" aria-label="Logout button">
+      <mat-icon>exit_to_app</mat-icon>
+    </button>
+  </ng-container>
+
+</mat-toolbar>
