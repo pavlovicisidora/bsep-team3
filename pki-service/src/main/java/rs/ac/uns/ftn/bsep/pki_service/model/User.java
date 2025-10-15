@@ -44,9 +44,12 @@ public class User implements UserDetails {
     @Column(nullable = false)
     private boolean isVerified = false;
 
+    @Column(name = "symmetric_key", columnDefinition = "TEXT")
+    private String userSymmetricKey;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.singletonList(new SimpleGrantedAuthority(role.name()));
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role.name()));
     }
 
     @Override
