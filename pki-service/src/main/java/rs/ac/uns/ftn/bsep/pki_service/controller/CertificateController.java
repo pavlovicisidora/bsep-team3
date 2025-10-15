@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CreateRootCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.model.CertificateData;
@@ -19,7 +20,7 @@ public class CertificateController {
 
     @PostMapping("/root")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> createRootCertificate(@Valid @RequestBody CreateRootCertificateDto dto) {
+    public ResponseEntity<?> createRootCertificate(@Valid @RequestBody CreateRootCertificateDto dto ) {
         try {
             CertificateData createdCertificate = certificateService.createRootCertificate(dto);
             return new ResponseEntity<>(createdCertificate, HttpStatus.CREATED);

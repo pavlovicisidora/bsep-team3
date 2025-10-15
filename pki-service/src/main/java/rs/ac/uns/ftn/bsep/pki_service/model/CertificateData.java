@@ -49,4 +49,7 @@ public class CertificateData {
     @Column(nullable = false)
     private boolean isRevoked = false;
 
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String keystorePassword;
+
 }

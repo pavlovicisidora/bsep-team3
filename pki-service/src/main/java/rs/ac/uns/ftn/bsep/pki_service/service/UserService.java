@@ -18,6 +18,10 @@ import com.nulabinc.zxcvbn.Strength;
 import com.nulabinc.zxcvbn.Zxcvbn;
 import rs.ac.uns.ftn.bsep.pki_service.util.JwtUtil;
 
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.UUID;
 
 @Service
@@ -72,6 +76,7 @@ public class UserService {
         newUser.setRole(UserRole.ORDINARY_USER);
         newUser.setVerified(false);
 
+
         User savedUser = userRepository.save(newUser);
         String tokenString = UUID.randomUUID().toString();
         VerificationToken token = new VerificationToken(tokenString, newUser);
@@ -80,6 +85,29 @@ public class UserService {
         emailService.sendActivationEmail(newUser.getEmail(), tokenString);
 
         return savedUser;
+    }
+
+    /*
+    Ovo cemo morati da uraidmo kada dodajemo CA korisnika, isto kao gore samo dodamo ovo, za AMDINA mozemo to i online
+
+    if (newUser.getRole() == Role.CA_USER) { // Prilagodite ovo vašem sistemu rola
+        String symmetricKey = generateUserSymmetricKey();
+        newUser.setUserSymmetricKey(symmetricKey);
+    }*/
+
+    private String generateUserSymmetricKey() {
+        try {
+            // AES ključevi mogu biti 128, 192, ili 256 bita. Koristimo 256 (32 bajta).
+            KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+            keyGen.init(256); // 256 bita
+            SecretKey secretKey = keyGen.generateKey();
+
+            // Vraćamo ključ kao Base64 string, jer to čuvamo u bazi
+            return Base64.getEncoder().encodeToString(secretKey.getEncoded());
+        } catch (NoSuchAlgorithmException e) {
+            // Ova greška se u praksi nikada ne bi trebala desiti za "AES"
+            throw new RuntimeException("Error generating symmetric key", e);
+        }
     }
 
     public void activateUser(String token) {
