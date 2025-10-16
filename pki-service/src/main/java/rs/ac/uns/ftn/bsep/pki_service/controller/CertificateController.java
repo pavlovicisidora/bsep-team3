@@ -29,4 +29,13 @@ public class CertificateController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    @PostMapping("/intermediate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CA_USER')") // Primer autorizacije
+    public ResponseEntity<CertificateData> createIntermediateCertificate(@RequestBody CreateIntermediateCertificateDto dto) {
+        CertificateData newCertificate = certificateService.createIntermediateCertificate(dto);
+        return new ResponseEntity<>(newCertificate, HttpStatus.CREATED);
+    }
+
+
 }
