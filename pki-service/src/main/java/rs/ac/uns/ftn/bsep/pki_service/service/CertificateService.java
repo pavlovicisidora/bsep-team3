@@ -7,6 +7,9 @@ import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.cert.X509CRLHolder;
+import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
@@ -31,17 +34,20 @@ import rs.ac.uns.ftn.bsep.pki_service.model.enums.RevocationReason;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
 import rs.ac.uns.ftn.bsep.pki_service.repository.CertificateRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
+import org.bouncycastle.asn1.x509.DistributionPoint;
+import org.bouncycastle.asn1.x509.DistributionPointName;
+import org.bouncycastle.asn1.x509.GeneralName;
+import org.bouncycastle.asn1.x509.GeneralNames;
+import org.bouncycastle.asn1.x509.CRLDistPoint;
 
 import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
+import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -255,6 +261,8 @@ public class CertificateService {
             certificateBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
             certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
 
+            certificateBuilder.addExtension(Extension.cRLDistributionPoints, false, createCrlDistributionPointsExtension(issuerData.getAlias()));
+
             ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
                     .setProvider("BC")
                     .build(issuerPrivateKey); // Potpisuje se privatnim ključem izdavaoca!
@@ -377,6 +385,8 @@ public class CertificateService {
             // Primer KeyUsage za SSL/TLS server sertifikat
             certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
 
+            certificateBuilder.addExtension(Extension.cRLDistributionPoints, false, createCrlDistributionPointsExtension(issuerData.getAlias()));
+
             ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
                     .setProvider("BC")
                     .build(issuerPrivateKey); // Potpisuje se privatnim ključem izdavaoca!
@@ -415,30 +425,74 @@ public class CertificateService {
     }
 
     public void revokeCertificate(BigInteger serialNumber, RevocationReason reason) {
-        // --- KORAK 1: Provera i autorizacija ---
-
-        // Pronalazimo sertifikat u bazi
         CertificateData certToRevoke = certificateRepository.findBySerialNumber(serialNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Certificate with serial number " + serialNumber + " not found."));
 
-        // Proveravamo da li je već povučen
         if (certToRevoke.isRevoked()) {
             throw new IllegalArgumentException("Certificate is already revoked.");
         }
 
-        // Proveravamo da li korisnik ima pravo da povuče ovaj sertifikat
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         boolean isAdmin = currentUser.getRole().equals(UserRole.ADMIN);
 
-        // Admin može da povuče bilo koji sertifikat.
-        // Korisnik (bilo koji) može da povuče samo svoj sertifikat.
         if (!isAdmin && !certToRevoke.getOwner().getId().equals(currentUser.getId())) {
             throw new SecurityException("You do not have permission to revoke this certificate.");
         }
 
-        // --- KORAK 2: Kaskadno povlačenje ---
-        // Pozivamo rekurzivnu metodu koja će povući ovaj i sve podređene sertifikate
         revokeChain(certToRevoke, reason);
+    }
+
+    public byte[] generateCrl(String issuerAlias) throws Exception {
+        CertificateData issuerData = certificateRepository.findAll().stream()
+                .filter(cert -> issuerAlias.equals(cert.getAlias()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Issuer with alias '" + issuerAlias + "' not found."));
+
+        if (!issuerData.isCa()) {
+            throw new IllegalArgumentException("The specified alias does not belong to a CA certificate.");
+        }
+        if (issuerData.isRevoked()) {
+            throw new IllegalArgumentException("Cannot generate CRL from a revoked issuer.");
+        }
+
+        X509Certificate issuerCert = keystoreService.readCertificate(issuerAlias);
+        PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(
+                issuerAlias,
+                getDecryptedKeystorePassword(issuerData)
+        );
+
+        if (issuerCert == null || issuerPrivateKey == null) {
+            throw new RuntimeException("Could not load issuer's certificate or private key from keystore.");
+        }
+
+        Date now = new Date();
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(now);
+        calendar.add(Calendar.DAY_OF_YEAR, 7);
+        Date nextUpdate = calendar.getTime();
+
+        X509v2CRLBuilder crlBuilder = new X509v2CRLBuilder(X500Name.getInstance(issuerCert.getSubjectX500Principal()), now);
+        crlBuilder.setNextUpdate(nextUpdate);
+
+        List<CertificateData> revokedCerts = certificateRepository.findByIssuerDNAndIsRevokedTrue(issuerData.getSubjectDN());
+
+        for (CertificateData revokedCert : revokedCerts) {
+            crlBuilder.addCRLEntry(
+                    revokedCert.getSerialNumber(),
+                    revokedCert.getRevocationDate(),
+                    revokedCert.getRevocationReason().getValue()
+            );
+        }
+
+        JcaContentSignerBuilder contentSignerBuilder = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
+                .setProvider("BC");
+        ContentSigner contentSigner = contentSignerBuilder.build(issuerPrivateKey);
+
+        X509CRLHolder crlHolder = crlBuilder.build(contentSigner);
+
+        X509CRL crl = new JcaX509CRLConverter().setProvider("BC").getCRL(crlHolder);
+
+        return crl.getEncoded();
     }
 
     private void revokeChain(CertificateData certData, RevocationReason reason) {
@@ -514,5 +568,16 @@ public class CertificateService {
 
     private String generateAlias(String commonName, BigInteger serialNumber) {
         return commonName.replace(" ", "_").toLowerCase() + "_" + serialNumber.toString(16);
+    }
+
+    private CRLDistPoint createCrlDistributionPointsExtension(String issuerAlias) {
+        String crlUrl = "http://localhost:8080/api/certificates/crl/" + issuerAlias;
+
+        GeneralName generalName = new GeneralName(GeneralName.uniformResourceIdentifier, crlUrl);
+        GeneralNames generalNames = new GeneralNames(generalName);
+        DistributionPointName distributionPointName = new DistributionPointName(generalNames);
+        DistributionPoint distributionPoint = new DistributionPoint(distributionPointName, null, null);
+
+        return new CRLDistPoint(new DistributionPoint[]{distributionPoint});
     }
 }

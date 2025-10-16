@@ -26,4 +26,5 @@ public interface CertificateRepository extends JpaRepository<CertificateData, Lo
     List<CertificateData> findByIsCaTrueAndIsRevokedFalseAndOwner(User owner);
 
     List<CertificateData> findByIssuerDN(String issuerDN);
+    List<CertificateData> findByIssuerDNAndIsRevokedTrue(String issuerDN);
 }
