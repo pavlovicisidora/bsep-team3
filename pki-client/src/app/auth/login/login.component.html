@@ -23,6 +23,10 @@
           <mat-error *ngIf="loginForm.get('password')?.touched && loginForm.get('password')?.invalid">Password is required.</mat-error>
         </mat-form-field>
 
+        <div class="forgot-password-link">
+          <a (click)="openForgotPasswordDialog()" style="cursor: pointer;">Forgot password?</a>
+        </div>
+
         <div class="recaptcha-container">
           <ngx-recaptcha2 
             #captchaElem 

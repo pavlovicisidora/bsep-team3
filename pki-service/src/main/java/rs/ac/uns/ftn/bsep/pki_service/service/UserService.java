@@ -6,6 +6,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import rs.ac.uns.ftn.bsep.pki_service.dto.LoginRequestDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.LoginResponseDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.PasswordResetRequestDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.UserRegistrationRequestDto;
 import org.apache.commons.lang3.RandomStringUtils;
 import rs.ac.uns.ftn.bsep.pki_service.dto.*;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
@@ -21,6 +25,7 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -182,5 +187,60 @@ public class UserService {
         user.setPasswordChangeRequired(false);
 
         userRepository.save(user);
+    }
+
+
+    //************ Account Recovery ***************//
+    public void initiatePasswordReset(String email) {
+
+        Optional<User> userOptional = userRepository.findByEmail(email);
+
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+
+
+            String tokenString = UUID.randomUUID().toString();
+            VerificationToken token = new VerificationToken(tokenString, user);
+            tokenRepository.save(token);
+
+
+            emailService.sendPasswordResetEmail(user.getEmail(), tokenString);
+        }
+    }
+
+
+    public void resetPassword(PasswordResetRequestDto resetDto) {
+
+        if (!resetDto.getNewPassword().equals(resetDto.getConfirmNewPassword())) {
+            throw new IllegalArgumentException("Passwords do not match.");
+        }
+
+
+        VerificationToken verificationToken = tokenRepository.findByToken(resetDto.getToken())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid password reset token."));
+
+
+        if (verificationToken.isExpired()) {
+
+            tokenRepository.delete(verificationToken);
+            throw new IllegalArgumentException("Password reset token has expired.");
+        }
+
+
+        User user = verificationToken.getUser();
+
+
+        Strength strength = zxcvbn.measure(resetDto.getNewPassword());
+        if (strength.getScore() < 2) {
+            String feedback = "New password is too weak. " + strength.getFeedback().getWarning();
+            throw new IllegalArgumentException(feedback.isEmpty() ? "New password is too weak." : feedback);
+        }
+
+
+        user.setPassword(passwordEncoder.encode(resetDto.getNewPassword()));
+        userRepository.save(user);
+
+        tokenRepository.delete(verificationToken);
     }
 }

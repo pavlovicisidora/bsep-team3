@@ -48,4 +48,19 @@ public class EmailService {
 
         mailSender.send(message);
     }
+
+
+    @Async
+    public void sendPasswordResetEmail(String to, String token) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("Oporavak lozinke - PKI Servis");
+
+        String resetUrl = "http://localhost:4200/reset-password?token=" + token;
+
+        message.setText("Poštovani,\n\nZatražili ste oporavak lozinke za Vaš nalog. Kliknite na link ispod kako biste postavili novu lozinku:\n\n"
+                + resetUrl + "\n\nUkoliko niste Vi zatražili oporavak, molimo Vas da ignorišete ovu poruku.\n\nLink ističe za 15 minuta.\n\nSrdačan pozdrav,\nVaš PKI Tim");
+
+        mailSender.send(message);
+    }
 }
