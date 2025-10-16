@@ -16,16 +16,21 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CreateIntermediateCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CreateRootCertificateDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.IssuerDto;
 import rs.ac.uns.ftn.bsep.pki_service.model.CertificateData;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
+import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
 import rs.ac.uns.ftn.bsep.pki_service.repository.CertificateRepository;
+import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
 
 import java.math.BigInteger;
 import java.security.*;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +39,38 @@ public class CertificateService {
     private final CertificateRepository certificateRepository;
     private final KeystoreService keystoreService;
     private final EncryptionService encryptionService;
+    private final UserRepository userRepository;
 
+    public List<IssuerDto> getAvailableIssuers() {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        List<CertificateData> potentialIssuers;
+
+        if (currentUser.getRole().equals("ADMIN")) {
+            // Admin vidi sve validne CA sertifikate
+            potentialIssuers = certificateRepository.findByIsCaTrueAndIsRevokedFalse();
+        } else {
+            // CA korisnik vidi samo svoje validne CA sertifikate
+            potentialIssuers = certificateRepository.findByIsCaTrueAndIsRevokedFalseAndOwner(currentUser);
+        }
+
+        return potentialIssuers.stream()
+                .map(cert -> new IssuerDto(
+                        cert.getSerialNumber().toString(),
+                        extractCommonName(cert.getSubjectDN()), // Pomoćna metoda
+                        cert.getAlias()))
+                .collect(Collectors.toList());
+    }
+
+    // Pomoćna metoda za izvlačenje Common Name iz DN stringa
+    private String extractCommonName(String dn) {
+        // Ovo je jednostavna implementacija, za produkciju razmislite o korišćenju biblioteke
+        for (String part : dn.split(",")) {
+            if (part.trim().startsWith("CN=")) {
+                return part.trim().substring(3);
+            }
+        }
+        return "Unknown";
+    }
 
     public CertificateData createRootCertificate(CreateRootCertificateDto dto) {
         try {
@@ -119,6 +155,7 @@ public class CertificateService {
 
     public CertificateData createIntermediateCertificate(CreateIntermediateCertificateDto dto) {
         try {
+            User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             // --- KORAK 1: Validacija i pribavljanje izdavaoca ---
 
             // Pronalazimo podatke o izdavaocu u bazi
@@ -127,6 +164,11 @@ public class CertificateService {
                 throw new IllegalArgumentException("Issuer certificate not found.");
             }
             CertificateData issuerData = issuerDataOptional.get();
+
+            assert currentUser != null;
+            if (UserRole.CA_USER.equals(currentUser.getRole()) && !issuerData.getOwner().getId().equals(currentUser.getId())) {
+                throw new SecurityException("CA user can only use certificates they own.");
+            }
 
             // Provera da li je izdavalac CA sertifikat
             if (!issuerData.isCa()) {
@@ -161,7 +203,7 @@ public class CertificateService {
             if(issuerPrivateKey == null) {
                 throw new RuntimeException("Could not load issuer's private key. The password might be incorrect.");
             }
-            
+
             // --- KORAK 3: Generisanje novog para ključeva za intermediate sertifikat ---
             KeyPair keyPair = generateKeyPair();
             PrivateKey privateKey = keyPair.getPrivate();
@@ -179,12 +221,14 @@ public class CertificateService {
 
             BigInteger serialNumber = new BigInteger(64, new SecureRandom());
 
+            X500Name issuerName = X500Name.getInstance(issuerCertificate.getSubjectX500Principal().getEncoded());
+
             JcaX509v3CertificateBuilder certificateBuilder = new JcaX509v3CertificateBuilder(
-                    X500Name.getInstance(issuerCertificate.getSubjectX500Principal()), // Issuer
+                    issuerName,
                     serialNumber,
                     dto.getValidFrom(),
                     dto.getValidTo(),
-                    subject, // Subject
+                    subject,
                     publicKey
             );
 
@@ -216,6 +260,16 @@ public class CertificateService {
             X509Certificate[] chain = {certificate, issuerCertificate};
             keystoreService.saveCertificateChain(chain, privateKey, alias, randomPassword);
 
+            // Postavljanje vlasnika
+            User owner = currentUser; // Podrazumevano, vlasnik je onaj ko kreira
+            if (currentUser.getRole().equals(UserRole.ADMIN) && dto.getOwnerId() != null) {
+                // Ako je admin i poslao je ownerId, pronađi tog korisnika i postavi ga kao vlasnika
+                // Ovde vam treba UserRepository da pronađete korisnika po ID-u
+                owner = userRepository.findById(dto.getOwnerId())
+                        .orElseThrow(() -> new IllegalArgumentException("User with specified ownerId not found."));
+            }
+
+
             // Priprema i čuvanje meta-podataka u bazu
             CertificateData certData = new CertificateData();
             certData.setSerialNumber(serialNumber);
@@ -226,6 +280,7 @@ public class CertificateService {
             certData.setCa(true);
             certData.setAlias(alias);
             certData.setKeystorePassword(encryptedPassword);
+            certData.setOwner(owner);
 
             return certificateRepository.save(certData);
 

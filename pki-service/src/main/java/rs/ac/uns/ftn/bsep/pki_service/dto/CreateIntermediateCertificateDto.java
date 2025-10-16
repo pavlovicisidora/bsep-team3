@@ -39,4 +39,7 @@ public class CreateIntermediateCertificateDto {
 
     @NotNull(message = "Serial number/allias of parent certificate is required.")
     private String issuerSerialNumber;
+
+    @NotNull(message = "Certificate OwnerId is required.")
+    private Long ownerId;
 }

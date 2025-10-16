@@ -52,4 +52,9 @@ public class CertificateData {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String keystorePassword;
 
+    @ManyToOne(fetch = FetchType.LAZY) // LAZY je za bolje performanse
+    @JoinColumn(name = "owner_id", nullable = false) // Definiše ime kolone u bazi
+    private User owner;
+
+
 }
