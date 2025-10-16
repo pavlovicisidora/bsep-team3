@@ -23,8 +23,15 @@ import { NgxCaptchaModule } from 'ngx-captcha';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { MatToolbarModule } from '@angular/material/toolbar'; 
 import { MatIconModule } from '@angular/material/icon';
+
 import { ForgotPasswordDialogComponent } from './auth/forgot-password-dialog/forgot-password-dialog.component';
 import { ResetPasswordComponent } from './auth/reset-password/reset-password.component';
+
+import { ForcePasswordChangeComponent } from './auth/force-password-change/force-password-change.component';
+import { NavbarComponent } from './navbar/navbar.component';
+import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.component';
+
+
 
 @NgModule({
   declarations: [
@@ -34,6 +41,9 @@ import { ResetPasswordComponent } from './auth/reset-password/reset-password.com
     DashboardComponent,
     ForgotPasswordDialogComponent,
     ResetPasswordComponent
+    ForcePasswordChangeComponent,
+    NavbarComponent,
+    CreateCaUserComponent
   ],
   imports: [
     BrowserModule,
@@ -52,7 +62,9 @@ import { ResetPasswordComponent } from './auth/reset-password/reset-password.com
     HttpClientModule,
     FormsModule,
     MatDialogModule,
-    MatSnackBarModule 
+    MatSnackBarModule, 
+    HttpClientModule
+
   ],
   providers: [
     {

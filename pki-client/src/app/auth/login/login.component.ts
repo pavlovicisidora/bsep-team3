@@ -50,7 +50,11 @@ export class LoginComponent implements OnInit {
     this.authService.login(this.loginForm.value).subscribe({
       next: (response) => {
         this.isLoading = false;
-        this.router.navigate(['/dashboard']); 
+        if (response.passwordChangeRequired) {
+          this.router.navigate(['/force-password-change']);
+        } else {
+          this.router.navigate(['/dashboard']); 
+        }
       },
       error: (err) => {
         this.isLoading = false;
