@@ -49,7 +49,7 @@ public class CertificateData {
     @Column(nullable = false)
     private boolean isRevoked = false;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = true ,columnDefinition = "TEXT")
     private String keystorePassword;
 
     @ManyToOne(fetch = FetchType.LAZY) // LAZY je za bolje performanse

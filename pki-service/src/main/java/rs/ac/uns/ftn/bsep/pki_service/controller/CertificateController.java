@@ -2,11 +2,14 @@ package rs.ac.uns.ftn.bsep.pki_service.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import rs.ac.uns.ftn.bsep.pki_service.dto.CreateEeCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CreateIntermediateCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CreateRootCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.IssuerDto;
@@ -45,6 +48,21 @@ public class CertificateController {
     @PreAuthorize("hasAnyRole('ADMIN', 'CA_USER')")
     public ResponseEntity<List<IssuerDto>> getIssuers() {
         return ResponseEntity.ok(certificateService.getAvailableIssuers());
+    }
+
+    @PostMapping("/end-entity")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CA_USER')")
+    public ResponseEntity<CertificateData> createEndEntityCertificate(
+            @RequestPart("dto") CreateEeCertificateDto dto,
+            @RequestPart("csrFile") MultipartFile csrFile) {
+        try {
+            CertificateData certificate = certificateService.createEndEntityCertificate(dto, csrFile);
+            return new ResponseEntity<>(certificate, HttpStatus.CREATED);
+        } catch (IllegalArgumentException | SecurityException e) {
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
 

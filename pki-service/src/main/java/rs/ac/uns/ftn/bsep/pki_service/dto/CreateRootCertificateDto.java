@@ -38,4 +38,7 @@ public class CreateRootCertificateDto {
     @Future(message = "End date must be in the future.")
     private Date validTo;
 
+    @NotNull(message = "Certificate OwnerId is required.")
+    private Long ownerId;
+
 }

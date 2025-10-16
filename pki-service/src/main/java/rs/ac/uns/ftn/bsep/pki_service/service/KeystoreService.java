@@ -62,6 +62,16 @@ public class KeystoreService {
         }
     }
 
+    public void saveTrustedCertificate(X509Certificate certificate, String alias) {
+        try {
+            KeyStore keyStore = loadKeyStore();
+            keyStore.setCertificateEntry(alias, certificate);
+            saveKeyStore(keyStore);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save trusted certificate to keystore.", e);
+        }
+    }
+
     public X509Certificate readCertificate(String alias) {
         try {
             KeyStore keyStore = loadKeyStore();
