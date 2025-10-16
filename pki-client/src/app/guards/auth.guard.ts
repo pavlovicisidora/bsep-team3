@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree, Router } from '@angular/router';
-import { Observable } from 'rxjs';
+import { map, Observable, take } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 
 @Injectable({
@@ -10,15 +10,23 @@ export class AuthGuard implements CanActivate {
 
   constructor(private authService: AuthService, private router: Router) {}
 
-  canActivate(
-    route: ActivatedRouteSnapshot,
-    state: RouterStateSnapshot): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
+  canActivate(route: ActivatedRouteSnapshot): boolean | UrlTree {
     
-    if (this.authService.isLoggedIn()) {
-      return true;
-    } else {
-      this.router.navigate(['/login']);
-      return false;
+    if (!this.authService.isLoggedIn()) {
+      return this.router.createUrlTree(['/login']);
     }
+
+    const expectedRoles = route.data['expectedRoles'] as Array<string>;
+    if (!expectedRoles) {
+      return true; 
+    }
+
+    const user = this.authService.currentUserValue;
+    if (user && expectedRoles.includes(user.role)) {
+      return true; 
+    }
+
+    console.warn(`Access denied. User with role ${user?.role} tried to access a route requiring roles: ${expectedRoles}`);
+    return this.router.createUrlTree(['/dashboard']);
   }
 }

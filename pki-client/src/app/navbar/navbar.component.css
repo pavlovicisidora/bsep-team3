@@ -1,0 +1,10 @@
+.spacer {
+  flex: 1 1 auto;
+}
+.user-info {
+  font-size: 0.9em;
+  margin-right: 15px;
+}
+a[mat-button] {
+  margin: 0 5px;
+}

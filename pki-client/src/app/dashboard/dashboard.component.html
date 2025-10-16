@@ -1,14 +1,4 @@
-<mat-toolbar color="primary">
-  <span>PKI Dashboard</span>
-  <span class="spacer"></span>
-  <span *ngIf="authService.currentUser$ | async as user">
-    Hello, {{ user.firstName }}
-  </span>
-  <button mat-icon-button (click)="logout()" aria-label="Logout button">
-    <mat-icon>exit_to_app</mat-icon>
-  </button>
-</mat-toolbar>
-
+<app-navbar></app-navbar>
 <div class="dashboard-container">
   <mat-card>
     <ng-container *ngIf="authService.currentUser$ | async as user">
