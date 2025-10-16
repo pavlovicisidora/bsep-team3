@@ -27,6 +27,7 @@ import rs.ac.uns.ftn.bsep.pki_service.dto.CreateRootCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.IssuerDto;
 import rs.ac.uns.ftn.bsep.pki_service.model.CertificateData;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
+import rs.ac.uns.ftn.bsep.pki_service.model.enums.RevocationReason;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
 import rs.ac.uns.ftn.bsep.pki_service.repository.CertificateRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
@@ -410,6 +411,54 @@ public class CertificateService {
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("Error while creating end-entity certificate.", e);
+        }
+    }
+
+    public void revokeCertificate(BigInteger serialNumber, RevocationReason reason) {
+        // --- KORAK 1: Provera i autorizacija ---
+
+        // Pronalazimo sertifikat u bazi
+        CertificateData certToRevoke = certificateRepository.findBySerialNumber(serialNumber)
+                .orElseThrow(() -> new IllegalArgumentException("Certificate with serial number " + serialNumber + " not found."));
+
+        // Proveravamo da li je već povučen
+        if (certToRevoke.isRevoked()) {
+            throw new IllegalArgumentException("Certificate is already revoked.");
+        }
+
+        // Proveravamo da li korisnik ima pravo da povuče ovaj sertifikat
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        boolean isAdmin = currentUser.getRole().equals(UserRole.ADMIN);
+
+        // Admin može da povuče bilo koji sertifikat.
+        // Korisnik (bilo koji) može da povuče samo svoj sertifikat.
+        if (!isAdmin && !certToRevoke.getOwner().getId().equals(currentUser.getId())) {
+            throw new SecurityException("You do not have permission to revoke this certificate.");
+        }
+
+        // --- KORAK 2: Kaskadno povlačenje ---
+        // Pozivamo rekurzivnu metodu koja će povući ovaj i sve podređene sertifikate
+        revokeChain(certToRevoke, reason);
+    }
+
+    private void revokeChain(CertificateData certData, RevocationReason reason) {
+        if (certData.isRevoked()) {
+            return;
+        }
+
+        certData.setRevoked(true);
+        certData.setRevocationReason(reason);
+        certData.setRevocationDate(new Date());
+        certificateRepository.save(certData);
+
+        System.out.println("Revoked certificate with SN: " + certData.getSerialNumber());
+
+        if (certData.isCa()) {
+            List<CertificateData> issuedCertificates = certificateRepository.findByIssuerDN(certData.getSubjectDN());
+
+            for (CertificateData issuedCert : issuedCertificates) {
+                revokeChain(issuedCert, RevocationReason.CA_COMPROMISE);
+            }
         }
     }
 
