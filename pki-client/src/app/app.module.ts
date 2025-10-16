@@ -40,7 +40,7 @@ import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.com
     LoginComponent,
     DashboardComponent,
     ForgotPasswordDialogComponent,
-    ResetPasswordComponent
+    ResetPasswordComponent,
     ForcePasswordChangeComponent,
     NavbarComponent,
     CreateCaUserComponent
