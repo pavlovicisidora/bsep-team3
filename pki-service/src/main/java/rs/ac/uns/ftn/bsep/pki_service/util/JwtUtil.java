@@ -11,10 +11,7 @@ import org.springframework.stereotype.Component;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
 
 import javax.crypto.SecretKey;
-import java.util.Base64;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 @Component
@@ -37,13 +34,24 @@ public class JwtUtil {
         claims.put("firstName", user.getFirstName());
         claims.put("lastName", user.getLastName());
         claims.put("role", user.getRole().name());
+
+        // KREIRANJE JEDINSTVENOG ID-ja ZA TOKEN (SESIJU)
+        String jti = UUID.randomUUID().toString();
+
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(user.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .setId(jti) // POSTAVLJANJE JTI CLAIM-A
                 .signWith(this.secretKey, SignatureAlgorithm.HS512)
                 .compact();
+    }
+
+
+    // NOVA METODA ZA IZVLAČENJE JTI IZ TOKENA
+    public String extractJti(String token) {
+        return extractClaim(token, Claims::getId);
     }
 
     /* Izvlači email (subject) iz tokena.
@@ -71,7 +79,7 @@ public class JwtUtil {
         return extractExpiration(token).before(new Date());
     }
 
-    private Date extractExpiration(String token) {
+    public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
 
@@ -82,6 +90,7 @@ public class JwtUtil {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
+
 
     /**
      * Glavna metoda za parsiranje tokena.

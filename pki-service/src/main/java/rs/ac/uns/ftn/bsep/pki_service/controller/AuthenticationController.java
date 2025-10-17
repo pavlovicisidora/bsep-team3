@@ -1,5 +1,6 @@
 package rs.ac.uns.ftn.bsep.pki_service.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -33,8 +34,8 @@ public class AuthenticationController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto loginDto) {
-        LoginResponseDto response = userService.login(loginDto);
+    public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto loginDto, HttpServletRequest request) {
+        LoginResponseDto response = userService.login(loginDto, request);
         return ResponseEntity.ok(response);
     }
 
