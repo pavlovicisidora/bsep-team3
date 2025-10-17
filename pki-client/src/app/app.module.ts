@@ -31,6 +31,10 @@ import { ForcePasswordChangeComponent } from './auth/force-password-change/force
 import { NavbarComponent } from './navbar/navbar.component';
 import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.component';
 import { ActiveSessionComponent } from './session-management/active-session/active-session.component';
+import { RootCertificateComponent } from './certificate-management/root-certificate/root-certificate.component';
+import { IntermediateCertificateComponent } from './certificate-management/intermediate-certificate/intermediate-certificate.component';
+import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
+import { CertificateViewComponent } from './certificate-management/certificate-view/certificate-view.component';
 
 
 
@@ -45,7 +49,11 @@ import { ActiveSessionComponent } from './session-management/active-session/acti
     ForcePasswordChangeComponent,
     NavbarComponent,
     CreateCaUserComponent,
-    ActiveSessionComponent
+    ActiveSessionComponent,
+    RootCertificateComponent,
+    IntermediateCertificateComponent,
+    EeCertificateComponent,
+    CertificateViewComponent
   ],
   imports: [
     BrowserModule,

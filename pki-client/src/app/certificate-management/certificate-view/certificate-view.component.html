@@ -1,0 +1,53 @@
+<div class="container">
+  <h2>Pregled Svih Sertifikata</h2>
+  <hr>
+
+  <!-- Prikaz poruke o učitavanju -->
+  <div *ngIf="isLoading" class="loading-message">
+    <p>Učitavanje podataka...</p>
+  </div>
+
+  <!-- Prikaz poruke ako nema sertifikata nakon učitavanja -->
+  <div *ngIf="!isLoading && certificates.length === 0" class="no-data-message">
+    <p>Nema dostupnih sertifikata za prikaz.</p>
+  </div>
+
+  <!-- Tabela se prikazuje samo ako nije učitavanje i ako ima podataka -->
+  <div *ngIf="!isLoading && certificates.length > 0" class="table-container">
+    <table class="certificate-table">
+      <thead>
+        <tr>
+          <th>Serijski Broj</th>
+          <th>Common Name (CN)</th>
+          <th>Izdavalac</th>
+          <th>Važi Od</th>
+          <th>Važi Do</th>
+          <th>CA</th>
+          <th>Povučen</th>
+          <th>Vlasnik</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Petlja koja prolazi kroz svaki sertifikat u nizu 'certificates' -->
+        <tr *ngFor="let cert of certificates">
+          <td data-label="Serijski Broj">{{ cert.serialNumber }}</td>
+          <td data-label="Common Name">{{ cert.commonName }}</td>
+          <td data-label="Izdavalac">{{ cert.issuerCommonName }}</td>
+          <td data-label="Važi Od">{{ cert.validFrom | date:'dd.MM.yyyy HH:mm' }}</td>
+          <td data-label="Važi Do">{{ cert.validTo | date:'dd.MM.yyyy HH:mm' }}</td>
+          <td data-label="CA">
+            <span [class.status-yes]="cert.isCa" [class.status-no]="!cert.isCa">
+              {{ cert.isCa ? 'Da' : 'Ne' }}
+            </span>
+          </td>
+          <td data-label="Povučen">
+            <span [class.status-yes]="cert.isRevoked" [class.status-no]="!cert.isRevoked">
+                {{ cert.isRevoked ? 'Da' : 'Ne' }}
+            </span>
+          </td>
+          <td data-label="Vlasnik">{{ cert.ownerUsername }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

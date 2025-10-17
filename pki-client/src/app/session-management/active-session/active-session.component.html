@@ -4,21 +4,21 @@
   <h1>Upravljanje Aktivnim Sesijama</h1>
   <p class="subtitle">Pregled svih uređaja na kojima ste trenutno prijavljeni.</p>
 
-  <!-- Prikaz spinner-a dok se podaci učitavaju -->
+  
   <div *ngIf="isLoading" class="loading-spinner">
     <div class="spinner"></div>
     <p>Učitavanje sesija...</p>
   </div>
 
-  <!-- Poruka ako nema aktivnih sesija -->
+  
   <div *ngIf="!isLoading && sessions.length === 0" class="no-sessions">
     <span class="material-icons">info</span>
     <p>Nemate drugih aktivnih sesija.</p>
   </div>
 
-  <!-- Lista aktivnih sesija -->
+  
   <div *ngIf="!isLoading && sessions.length > 0" class="sessions-list">
-    <!-- Dodajemo klase dinamički na osnovu statusa sesije -->
+    
     <div *ngFor="let session of sessions"
          class="session-card"
          [class.current-session]="session.isCurrentSession && !isSessionExpired(session)"
@@ -29,15 +29,15 @@
         <div class="device-info">
           <h2>{{ session.device.name }}</h2>
           
-          <!-- <<--- NOVI, ORGANIZOVANI KONTEJNER ZA BEDŽEVE --->
+          
           <div class="status-container">
-            <!-- Prikazuje bedž "Ova sesija" SAMO ako je sesija trenutna I aktivna -->
+           
             <div *ngIf="session.isCurrentSession && !isSessionExpired(session)" class="current-badge">
               <span class="material-icons">check_circle</span>
               This session
             </div>
 
-            <!-- Prikazuje bedž "Aktivan" ili "Istekao" -->
+            
             <div *ngIf="!isSessionExpired(session)" class="status-badge status-active">Aktivan</div>
             <div *ngIf="isSessionExpired(session)" class="status-badge status-expired">Istekao</div>
           </div>
@@ -60,7 +60,7 @@
       </div>
 
       <div class="session-actions">
-        <!-- Dugme je onemogućeno ako je sesija istekla -->
+       
         <button (click)="revokeSession(session.jti)"
                 class="revoke-button"
                 [disabled]="isSessionExpired(session)">

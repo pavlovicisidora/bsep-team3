@@ -1,0 +1,60 @@
+.container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+h2 {
+  text-align: center;
+  color: #333;
+}
+
+.loading-message, .no-data-message {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.2rem;
+  color: #777;
+}
+
+.table-container {
+  overflow-x: auto; /* Omogućava horizontalni skrol na manjim ekranima */
+}
+
+.certificate-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.certificate-table th, .certificate-table td {
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+.certificate-table th {
+  background-color: #3f51b5; /* Plava boja, kao u Material dizajnu */
+  color: white;
+  font-weight: bold;
+}
+
+.certificate-table tbody tr:nth-of-type(even) {
+  background-color: #f3f3f3;
+}
+
+.certificate-table tbody tr:hover {
+  background-color: #e8eaf6; /* Svetlo plava pri hoveru */
+}
+
+/* Stilovi za boolean vrednosti */
+.status-yes {
+  color: #4caf50; /* Zelena */
+  font-weight: bold;
+}
+
+.status-no {
+  color: #f44336; /* Crvena */
+}

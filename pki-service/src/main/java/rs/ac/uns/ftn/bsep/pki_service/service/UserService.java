@@ -27,8 +27,10 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -62,21 +64,17 @@ public class UserService {
     }
 
     public User registerOrdinaryUser(UserRegistrationRequestDto dto) {
-        log.info("Attempting to register a new ordinary user with email: {}", dto.getEmail());
         if (!dto.getPassword().equals(dto.getConfirmPassword())) {
-            log.warn("User registration failed for email {}: Passwords do not match.", dto.getEmail());
             throw new IllegalArgumentException("Passwords do not match.");
         }
 
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
-            log.warn("User registration failed: Email {} is already in use.", dto.getEmail());
             throw new IllegalArgumentException("Email is already in use.");
         }
 
         Strength strength = zxcvbn.measure(dto.getPassword());
         if (strength.getScore() < 2) {
             String feedback = "Password is too weak. " + strength.getFeedback().getWarning();
-            log.warn("User registration failed for email {}: Password is too weak.", dto.getEmail());
             throw new IllegalArgumentException(feedback.isEmpty() ? "Password is too weak." : feedback);
         }
 
@@ -179,7 +177,9 @@ public class UserService {
         );
 
         final UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(dto.getEmail());
+
         User user = (User) userDetails;
+
         final String token = jwtUtil.generateToken(user);
         sessionService.createSession(user, token, request);
 
@@ -213,6 +213,22 @@ public class UserService {
         log.info("AUDIT: CA user {} successfully changed their password.", userEmail);
     }
 
+    public List<CaUserDto> getAllCaUsers() {
+        // Dobavljamo sve korisnike sa ulogom CA_USER iz baze
+        List<User> caUsers = userRepository.findByRole(UserRole.CA_USER);
+
+        // Mapiramo svakog User-a u CaUserDto, uzimajući samo potrebna polja
+        return caUsers.stream()
+                .map(user -> new CaUserDto(
+                        user.getId(),
+                        user.getFirstName(),
+                        user.getLastName(),
+                        user.getEmail()
+                ))
+                .collect(Collectors.toList());
+    }
+
+
     //************ Account Recovery ***************//
     public void initiatePasswordReset(String email) {
         // Logujemo pokušaj bez obzira da li korisnik postoji, da se spreči otkrivanje postojećih email adresa.
@@ -227,6 +243,7 @@ public class UserService {
             emailService.sendPasswordResetEmail(user.getEmail(), tokenString);
         }
     }
+
 
     public void resetPassword(PasswordResetRequestDto resetDto) {
         log.info("Attempting to reset password using a verification token.");
@@ -255,6 +272,7 @@ public class UserService {
             log.warn("Password reset failed for user {}: New password is too weak.", user.getEmail());
             throw new IllegalArgumentException(feedback.isEmpty() ? "New password is too weak." : feedback);
         }
+
 
         user.setPassword(passwordEncoder.encode(resetDto.getNewPassword()));
         userRepository.save(user);
