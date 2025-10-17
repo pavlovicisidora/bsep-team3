@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Putanja gde ce se cuvati log fajlovi -->
+    <property name="LOGS" value="./logs" />
+
+    <!-- Appender za KONZOLU (korisno tokom developmenta) -->
+    <appender name="Console"
+              class="ch.qos.logback.core.ConsoleAppender">
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <Pattern>
+                <!-- Boje za konzolu, %X{...} su podaci iz MDC filtera -->
+                %black(%d{ISO8601}) %highlight(%-5level) [%blue(%t)] %yellow([User:%X{user} IP:%X{clientIp}]): %msg%n%throwable
+            </Pattern>
+        </layout>
+    </appender>
+
+    <!-- Appender za FAJL sa ROTACIJOM (za produkciju i audit) -->
+    <appender name="RollingFile"
+              class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOGS}/pki-system.log</file>
+        <encoder
+                class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!-- Standardizovan format bez boja za fajl -->
+            <!-- Format osigurava neporecivost: VREME | NIVOA | NIT | KLASA | [USER IP] | PORUKA -->
+            <Pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - [User:%X{user} IP:%X{clientIp}] - %msg%n</Pattern>
+        </encoder>
+
+        <!-- Politika rotacije logova -->
+        <rollingPolicy
+                class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- Rotacija svaki dan, arhivirani fajlovi dobijaju datum i brojac -->
+            <fileNamePattern>${LOGS}/archived/pki-system-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+
+            <!-- Rotiraj fajl kada dostigne 10MB -->
+            <maxFileSize>10MB</maxFileSize>
+
+            <!-- Cuvaj logove maksimalno 60 dana -->
+            <maxHistory>60</maxHistory>
+
+            <!-- Ukupna velicina svih logova ne sme preći 2GB -->
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Loguj sve od nivoa INFO pa navise -->
+    <root level="info">
+        <appender-ref ref="RollingFile" />
+        <appender-ref ref="Console" />
+    </root>
+
+    <!-- Primer: Mozemo smanjiti logovanje za Spring framework da ne gusi logove -->
+    <logger name="org.springframework" level="warn" />
+
+</configuration>

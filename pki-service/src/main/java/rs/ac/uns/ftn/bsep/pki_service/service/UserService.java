@@ -1,5 +1,6 @@
 package rs.ac.uns.ftn.bsep.pki_service.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -29,6 +30,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -57,17 +59,21 @@ public class UserService {
     }
 
     public User registerOrdinaryUser(UserRegistrationRequestDto dto) {
+        log.info("Attempting to register a new ordinary user with email: {}", dto.getEmail());
         if (!dto.getPassword().equals(dto.getConfirmPassword())) {
+            log.warn("User registration failed for email {}: Passwords do not match.", dto.getEmail());
             throw new IllegalArgumentException("Passwords do not match.");
         }
 
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
+            log.warn("User registration failed: Email {} is already in use.", dto.getEmail());
             throw new IllegalArgumentException("Email is already in use.");
         }
 
         Strength strength = zxcvbn.measure(dto.getPassword());
         if (strength.getScore() < 2) {
             String feedback = "Password is too weak. " + strength.getFeedback().getWarning();
+            log.warn("User registration failed for email {}: Password is too weak.", dto.getEmail());
             throw new IllegalArgumentException(feedback.isEmpty() ? "Password is too weak." : feedback);
         }
 
@@ -86,13 +92,16 @@ public class UserService {
         VerificationToken token = new VerificationToken(tokenString, newUser);
         tokenRepository.save(token);
 
+        log.info("AUDIT: New ordinary user registered successfully with email: {}. Awaiting activation.", savedUser.getEmail());
         emailService.sendActivationEmail(newUser.getEmail(), tokenString);
 
         return savedUser;
     }
 
     public void createCaUser(CaUserCreateRequestDto dto) {
+        log.info("AUDIT: Admin is attempting to create a new CA user with email: {}", dto.getEmail());
         if (userRepository.findByEmail(dto.getEmail()).isPresent()) {
+            log.warn("CA user creation failed: Email {} is already in use.", dto.getEmail());
             throw new IllegalArgumentException("Email is already in use.");
         }
 
@@ -112,12 +121,14 @@ public class UserService {
         newUser.setUserSymmetricKey(symmetricKey);
 
         userRepository.save(newUser);
+        log.info("AUDIT: New CA user created successfully with email: {}. Sending credentials.", newUser.getEmail());
 
         emailService.sendCaUserCredentials(newUser.getEmail(), rawPassword);
     }
 
     private String generateUserSymmetricKey() {
         try {
+            log.info("Generating new 256-bit AES symmetric key for a user.");
             // AES ključevi mogu biti 128, 192, ili 256 bita. Koristimo 256 (32 bajta).
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
             keyGen.init(256); // 256 bita
@@ -126,16 +137,22 @@ public class UserService {
             // Vraćamo ključ kao Base64 string, jer to čuvamo u bazi
             return Base64.getEncoder().encodeToString(secretKey.getEncoded());
         } catch (NoSuchAlgorithmException e) {
+            log.error("CRITICAL: AES algorithm not found while generating symmetric key.", e);
             // Ova greška se u praksi nikada ne bi trebala desiti za "AES"
             throw new RuntimeException("Error generating symmetric key", e);
         }
     }
 
     public void activateUser(String token) {
+        log.info("Attempting to activate user account with a verification token.");
         VerificationToken verificationToken = tokenRepository.findByToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid activation token."));
+                .orElseThrow(() -> {
+                    log.warn("Account activation failed: Invalid activation token provided.");
+                    return new IllegalArgumentException("Invalid activation token.");
+                });
 
         if (verificationToken.isExpired()) {
+            log.warn("Account activation failed for user {}: Token has expired.", verificationToken.getUser().getEmail());
             tokenRepository.delete(verificationToken);
             throw new IllegalArgumentException("Activation token has expired.");
         }
@@ -143,103 +160,100 @@ public class UserService {
         User user = verificationToken.getUser();
         user.setVerified(true);
         userRepository.save(user);
+        log.info("AUDIT: User account successfully activated for email: {}", user.getEmail());
 
         tokenRepository.delete(verificationToken);
     }
 
     public LoginResponseDto login(LoginRequestDto dto) {
         if (!recaptchaService.validateToken(dto.getRecaptchaToken())) {
-           throw new IllegalArgumentException("reCAPTCHA validation failed.");
+            log.warn("Login failed for user {}: reCAPTCHA validation failed.", dto.getEmail());
+            throw new IllegalArgumentException("reCAPTCHA validation failed.");
         }
 
         authenticationManager.authenticate(
-              new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
+                new UsernamePasswordAuthenticationToken(dto.getEmail(), dto.getPassword())
         );
 
         final UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(dto.getEmail());
-
         User user = (User) userDetails;
-
         final String token = jwtUtil.generateToken(user);
-
         return new LoginResponseDto(token, user.isPasswordChangeRequired());
     }
 
     public void caUserChangePassword(String userEmail, CaUserPasswordChangeRequestDto dto) {
+        log.info("AUDIT: CA user {} is attempting to change their password.", userEmail);
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found!"));
 
         if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
+            log.warn("Password change failed for user {}: Incorrect current password.", userEmail);
             throw new IllegalArgumentException("Incorrect current password.");
         }
 
         if (!dto.getNewPassword().equals(dto.getConfirmNewPassword())) {
+            log.warn("Password change failed for user {}: New passwords do not match.", userEmail);
             throw new IllegalArgumentException("New passwords do not match.");
         }
 
         Strength strength = zxcvbn.measure(dto.getNewPassword());
         if (strength.getScore() < 2) {
+            log.warn("Password change failed for user {}: New password is too weak.", userEmail);
             throw new IllegalArgumentException("New password is too weak.");
         }
 
         user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
-
         user.setPasswordChangeRequired(false);
-
         userRepository.save(user);
+        log.info("AUDIT: CA user {} successfully changed their password.", userEmail);
     }
-
 
     //************ Account Recovery ***************//
     public void initiatePasswordReset(String email) {
-
+        // Logujemo pokušaj bez obzira da li korisnik postoji, da se spreči otkrivanje postojećih email adresa.
+        log.info("Password reset process initiated for email: {}", email);
         Optional<User> userOptional = userRepository.findByEmail(email);
-
 
         if (userOptional.isPresent()) {
             User user = userOptional.get();
-
-
             String tokenString = UUID.randomUUID().toString();
             VerificationToken token = new VerificationToken(tokenString, user);
             tokenRepository.save(token);
-
-
             emailService.sendPasswordResetEmail(user.getEmail(), tokenString);
         }
     }
 
-
     public void resetPassword(PasswordResetRequestDto resetDto) {
-
+        log.info("Attempting to reset password using a verification token.");
         if (!resetDto.getNewPassword().equals(resetDto.getConfirmNewPassword())) {
+            log.warn("Password reset failed: Passwords do not match.");
             throw new IllegalArgumentException("Passwords do not match.");
         }
 
-
         VerificationToken verificationToken = tokenRepository.findByToken(resetDto.getToken())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid password reset token."));
-
+                .orElseThrow(() -> {
+                    log.warn("Password reset failed: Invalid password reset token provided.");
+                    return new IllegalArgumentException("Invalid password reset token.");
+                });
 
         if (verificationToken.isExpired()) {
-
+            log.warn("Password reset failed for user {}: Token has expired.", verificationToken.getUser().getEmail());
             tokenRepository.delete(verificationToken);
             throw new IllegalArgumentException("Password reset token has expired.");
         }
 
-
         User user = verificationToken.getUser();
-
 
         Strength strength = zxcvbn.measure(resetDto.getNewPassword());
         if (strength.getScore() < 2) {
             String feedback = "New password is too weak. " + strength.getFeedback().getWarning();
+            log.warn("Password reset failed for user {}: New password is too weak.", user.getEmail());
             throw new IllegalArgumentException(feedback.isEmpty() ? "New password is too weak." : feedback);
         }
 
-
         user.setPassword(passwordEncoder.encode(resetDto.getNewPassword()));
         userRepository.save(user);
+        log.info("AUDIT: Password successfully reset for user: {}", user.getEmail());
 
         tokenRepository.delete(verificationToken);
     }
