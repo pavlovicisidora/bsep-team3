@@ -21,6 +21,7 @@ import rs.ac.uns.ftn.bsep.pki_service.repository.VerificationTokenRepository;
 import com.nulabinc.zxcvbn.Strength;
 import com.nulabinc.zxcvbn.Zxcvbn;
 import rs.ac.uns.ftn.bsep.pki_service.util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
 
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
@@ -40,6 +41,7 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService customUserDetailsService;
+    private final SessionService sessionService;
 
     private final Zxcvbn zxcvbn = new Zxcvbn();
 
@@ -47,7 +49,7 @@ public class UserService {
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        VerificationTokenRepository tokenRepository, EmailService emailService,
                        RecaptchaService recaptchaService, AuthenticationManager authenticationManager,
-                       JwtUtil jwtUtil, CustomUserDetailsService customUserDetailsService) {
+                       JwtUtil jwtUtil, CustomUserDetailsService customUserDetailsService, SessionService sessionService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenRepository = tokenRepository;
@@ -55,6 +57,7 @@ public class UserService {
         this.recaptchaService = recaptchaService;
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
+        this.sessionService = sessionService;
         this.customUserDetailsService = customUserDetailsService;
     }
 
@@ -165,7 +168,7 @@ public class UserService {
         tokenRepository.delete(verificationToken);
     }
 
-    public LoginResponseDto login(LoginRequestDto dto) {
+    public LoginResponseDto login(LoginRequestDto dto, HttpServletRequest request) {
         if (!recaptchaService.validateToken(dto.getRecaptchaToken())) {
             log.warn("Login failed for user {}: reCAPTCHA validation failed.", dto.getEmail());
             throw new IllegalArgumentException("reCAPTCHA validation failed.");
@@ -178,6 +181,8 @@ public class UserService {
         final UserDetails userDetails = this.customUserDetailsService.loadUserByUsername(dto.getEmail());
         User user = (User) userDetails;
         final String token = jwtUtil.generateToken(user);
+        sessionService.createSession(user, token, request);
+
         return new LoginResponseDto(token, user.isPasswordChangeRequired());
     }
 

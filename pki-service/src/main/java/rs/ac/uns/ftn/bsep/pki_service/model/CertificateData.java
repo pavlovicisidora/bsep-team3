@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import rs.ac.uns.ftn.bsep.pki_service.model.enums.RevocationReason;
 
 @Entity
 @Table(name = "certificates")
@@ -48,6 +49,13 @@ public class CertificateData {
 
     @Column(nullable = false)
     private boolean isRevoked = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = true)
+    private RevocationReason revocationReason;
+
+    @Column(nullable = true)
+    private Date revocationDate;
 
     @Column(nullable = true ,columnDefinition = "TEXT")
     private String keystorePassword;

@@ -43,4 +43,7 @@ public interface CertificateRepository extends JpaRepository<CertificateData, Lo
             "JOIN CertificateData cd ON cr.issuerSerialNumber = cd.serialNumber " +
             "WHERE cr.id = :requestId AND cd.owner = :owner")
     boolean isUserOwnerOfIssuerCertificateForRequest(@Param("requestId") Long requestId, @Param("owner") User owner);
+
+    List<CertificateData> findByIssuerDN(String issuerDN);
+    List<CertificateData> findByIssuerDNAndIsRevokedTrue(String issuerDN);
 }

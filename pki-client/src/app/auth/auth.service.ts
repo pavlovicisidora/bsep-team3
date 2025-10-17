@@ -4,7 +4,7 @@ import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../environment';
 import { Router } from '@angular/router';
 import { jwtDecode } from 'jwt-decode';
-
+import { finalize } from 'rxjs/operators';
 
 export interface ResetPasswordPayload {
   token: string;
@@ -89,11 +89,31 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem(this.tokenKey);
-    this.currentUserSubject.next(null); 
-    this.passwordChangeRequiredSubject.next(false);
-    this.router.navigate(['/login']);
+    console.log('Pokretanje procesa odjave...');
+
+    // Prvo šaljemo zahtev serveru da obriše sesiju iz baze.
+    // Vaš AuthInterceptor će automatski dodati "Authorization" heder.
+    this.http.delete(`${this.apiUrl}/api/sessions/logout`).pipe(
+      // Operator 'finalize' se izvršava UVEK nakon što se HTTP poziv završi,
+      // bez obzira da li je bio uspešan ili ne. Ovo garantuje da će se
+      // korisnik uvek odjaviti na frontendu.
+      finalize(() => {
+        console.log('Server odgovorio. Čišćenje lokalnih podataka...');
+        
+        // Logika koju ste već imali sada ide ovde:
+        localStorage.removeItem(this.tokenKey);
+        this.currentUserSubject.next(null); 
+        this.passwordChangeRequiredSubject.next(false);
+        this.router.navigate(['/login']);
+      })
+    ).subscribe({
+      // Subscribe blok je neophodan da bi se HTTP zahtev uopšte poslao.
+      // Ovde možemo dodati logere za lakše debagovanje.
+      next: () => console.log('Server je potvrdio brisanje sesije.'),
+      error: (err) => console.error('Greška pri odjavi na serveru (korisnik će svejedno biti odjavljen na frontendu):', err)
+    });
   }
+
 
   forgotPassword(email: string): Observable<string> {
     

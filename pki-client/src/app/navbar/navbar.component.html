@@ -21,6 +21,12 @@
   <span class="spacer"></span>
 
   <ng-container *ngIf="isLoggedIn$ | async">
+    
+    <a mat-button routerLink="/sessions">
+      <mat-icon>devices</mat-icon> <!-- Ikona za uređaje/sesije -->
+      <span>Active Sessions</span>
+    </a>
+
     <span *ngIf="authService.currentUser$ | async as user" class="user-info">
       {{ user.firstName }} ({{ user.role }})
     </span>

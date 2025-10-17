@@ -1,5 +1,6 @@
 package rs.ac.uns.ftn.bsep.pki_service.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,12 +40,12 @@ public class AuthenticationController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto loginDto) {
-      try {
-          LoginResponseDto response = userService.login(loginDto);
-          log.info("AUDIT: Successful login to the system for the user: {}", loginDto.getEmail());
-          return ResponseEntity.ok(response);
-      }catch(BadCredentialsException e) {
+    public ResponseEntity<LoginResponseDto> login(@Valid @RequestBody LoginRequestDto loginDto, HttpServletRequest request) {
+        try {
+            LoginResponseDto response = userService.login(loginDto, request);
+            log.info("AUDIT: Successful login to the system for the user: {}", loginDto.getEmail());
+            return ResponseEntity.ok(response);
+        }catch(BadCredentialsException e) {
             // NAKON NEUSPEŠNOG LOGINA (Bitno za bezbednost!):
             log.warn("AUDIT: Unsuccessful login attempt (wrong password) for email: {}", loginDto.getEmail());
             throw e;
