@@ -1,6 +1,7 @@
 package rs.ac.uns.ftn.bsep.pki_service.controller;
 
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import rs.ac.uns.ftn.bsep.pki_service.service.UserService;
 @RestController
 @PreAuthorize("hasRole('ADMIN')")
 @RequestMapping("/api/admin")
+@Slf4j
 public class AdminController {
     private final UserService userService;
 
@@ -25,6 +27,7 @@ public class AdminController {
 
     @PostMapping("/ca-user")
     public ResponseEntity<String> createCaUser(@Valid @RequestBody CaUserCreateRequestDto dto) {
+        log.info("AUDIT: Admin trying to create new CA user.");
         userService.createCaUser(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body("CA user created successfully. Credentials have been sent to their email.");
     }
