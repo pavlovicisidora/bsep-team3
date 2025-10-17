@@ -31,5 +31,6 @@ build/
 
 .env
 application-dev.properties
+keystore.jks
 ### VS Code ###
 .vscode/
