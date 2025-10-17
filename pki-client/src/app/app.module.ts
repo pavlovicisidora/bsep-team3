@@ -30,6 +30,7 @@ import { ResetPasswordComponent } from './auth/reset-password/reset-password.com
 import { ForcePasswordChangeComponent } from './auth/force-password-change/force-password-change.component';
 import { NavbarComponent } from './navbar/navbar.component';
 import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.component';
+import { ActiveSessionComponent } from './session-management/active-session/active-session.component';
 
 
 
@@ -43,7 +44,8 @@ import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.com
     ResetPasswordComponent,
     ForcePasswordChangeComponent,
     NavbarComponent,
-    CreateCaUserComponent
+    CreateCaUserComponent,
+    ActiveSessionComponent
   ],
   imports: [
     BrowserModule,

@@ -7,7 +7,7 @@ import { DashboardComponent } from './dashboard/dashboard.component';
 import { ResetPasswordComponent } from './auth/reset-password/reset-password.component';
 import { ForcePasswordChangeComponent } from './auth/force-password-change/force-password-change.component';
 import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.component';
-
+import { ActiveSessionComponent } from './session-management/active-session/active-session.component';
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
@@ -20,6 +20,12 @@ const routes: Routes = [
     path: 'dashboard', 
     component: DashboardComponent, 
     canActivate: [AuthGuard]
+  },
+
+  { 
+    path: 'sessions', // URL će biti /sessions
+    component: ActiveSessionComponent, 
+    canActivate: [AuthGuard] // OBAVEZNO zaštitite rutu!
   },
   
   { path: '', redirectTo: '/login', pathMatch: 'full' },
