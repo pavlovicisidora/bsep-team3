@@ -26,8 +26,10 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -191,6 +193,21 @@ public class UserService {
         user.setPasswordChangeRequired(false);
 
         userRepository.save(user);
+    }
+
+    public List<CaUserDto> getAllCaUsers() {
+        // Dobavljamo sve korisnike sa ulogom CA_USER iz baze
+        List<User> caUsers = userRepository.findByRole(UserRole.CA_USER);
+
+        // Mapiramo svakog User-a u CaUserDto, uzimajući samo potrebna polja
+        return caUsers.stream()
+                .map(user -> new CaUserDto(
+                        user.getId(),
+                        user.getFirstName(),
+                        user.getLastName(),
+                        user.getEmail()
+                ))
+                .collect(Collectors.toList());
     }
 
 

@@ -1,0 +1,63 @@
+<div class="container mt-4">
+  <h2>Podnošenje Zahteva za Sertifikat (CSR)</h2>
+  <p>Popunite formu i priložite vaš fajl sa zahtevom za potpisivanje sertifikata (.csr).</p>
+  <hr>
+
+  <div *ngIf="isLoading; else formContent" class="loading-container">
+    <p>Učitavanje podataka...</p>
+  </div>
+
+  <ng-template #formContent>
+    <form [formGroup]="eeCertForm" (ngSubmit)="onSubmit()">
+
+      <!-- Issuer Dropdown -->
+      <div class="form-group mb-3">
+        <label for="issuerSerialNumber" class="form-label">Izaberite Izdavaoca (CA)</label>
+        <select id="issuerSerialNumber" class="form-control" formControlName="issuerSerialNumber">
+          <option [ngValue]="null" disabled>Izaberite CA koji će potpisati zahtev...</option>
+          <option *ngFor="let issuer of issuers" [value]="issuer.serialNumber">
+            {{ issuer.commonName }} (važi do: {{ issuer.validTo | date:'dd.MM.yyyy HH:mm' }})
+          </option>
+        </select>
+        <div *ngIf="isControlInvalid('issuerSerialNumber')" class="text-danger mt-1">
+          Morate izabrati izdavaoca.
+        </div>
+      </div>
+      
+      <!-- CSR File Upload -->
+      <div class="form-group mb-3">
+        <label for="csrFile" class="form-label">Priložite CSR Fajl</label>
+        <!-- Sakrivamo default input i stilizujemo labelu kao dugme -->
+        <input type="file" id="csrFile" class="d-none" (change)="onFileSelected($event)" accept=".csr,.txt">
+        <div class="file-upload-wrapper">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('csrFile').click()">
+                Izaberi Fajl...
+            </button>
+            <span class="file-name ms-3">{{ selectedFile?.name || 'Nijedan fajl nije izabran' }}</span>
+        </div>
+        <!-- Prikazujemo grešku ako fajl nije izabran prilikom submit-a -->
+        <div *ngIf="!selectedFile && eeCertForm.touched" class="text-danger mt-1">
+            Morate priložiti .csr fajl.
+        </div>
+      </div>
+      
+      <!-- Željeni datum isteka -->
+      <div class="form-group mb-3">
+        <label for="validTo" class="form-label">Željeni Datum Isteka</label>
+        <input type="datetime-local" id="validTo" class="form-control" formControlName="validTo">
+        <div *ngIf="isControlInvalid('validTo')" class="text-danger mt-1">
+          <div *ngIf="eeCertForm.get('validTo')?.errors?.['required']">Datum isteka je obavezno polje.</div>
+          <div *ngIf="eeCertForm.get('validTo')?.errors?.['dateNotInFuture']">Datum isteka mora biti u budućnosti.</div>
+          <div *ngIf="eeCertForm.get('validTo')?.errors?.['issuerWillExpire']">
+            Datum isteka ne može biti nakon datuma isteka izabranog izdavaoca.
+          </div>
+        </div>
+      </div>
+      
+      <!-- Dugme za slanje -->
+      <button type="submit" class="btn btn-primary" [disabled]="eeCertForm.invalid || !selectedFile">
+        Pošalji Zahtev
+      </button>
+    </form>
+  </ng-template>
+</div>

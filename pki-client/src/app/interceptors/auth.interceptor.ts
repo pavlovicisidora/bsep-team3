@@ -28,7 +28,7 @@ export class AuthInterceptor implements HttpInterceptor {
     return next.handle(request).pipe(
       catchError((error: HttpErrorResponse) => {
         
-        if (error.status === 403) {
+        if (error.status === 401) {
           
           console.error('AuthInterceptor detected 401 Unauthorized. Logging out.');
           

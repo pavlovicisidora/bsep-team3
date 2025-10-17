@@ -1,0 +1,82 @@
+<app-navbar></app-navbar>
+<div class="container mt-4">
+  <h2>Kreiranje Root Sertifikata</h2>
+  <p>Popunite podatke ispod da biste generisali novi Root CA sertifikat.</p>
+  <hr>
+
+  <!-- Forma je povezana sa 'certificateForm' iz .ts fajla -->
+  <form [formGroup]="certificateForm" (ngSubmit)="onSubmit()">
+
+    <!-- Common Name -->
+    <div class="form-group mb-3">
+      <label for="commonName" class="form-label">Common Name (CN)</label>
+      <input type="text" id="commonName" class="form-control" formControlName="commonName" placeholder="Npr. Moja Kompanija Root CA">
+      <!-- Prikaz poruke o grešci ako polje nije validno -->
+      <div *ngIf="isControlInvalid('commonName')" class="text-danger mt-1">
+        Common Name je obavezno polje.
+      </div>
+    </div>
+
+    <!-- Organization -->
+    <div class="form-group mb-3">
+      <label for="organization" class="form-label">Organizacija (O)</label>
+      <input type="text" id="organization" class="form-control" formControlName="organization" placeholder="Npr. Moja Kompanija">
+      <div *ngIf="isControlInvalid('organization')" class="text-danger mt-1">
+        Naziv organizacije je obavezno polje.
+      </div>
+    </div>
+
+    <!-- Organizational Unit -->
+    <div class="form-group mb-3">
+      <label for="organizationalUnit" class="form-label">Organizaciona Jedinica (OU)</label>
+      <input type="text" id="organizationalUnit" class="form-control" formControlName="organizationalUnit" placeholder="Npr. IT Sektor">
+      <div *ngIf="isControlInvalid('organizationalUnit')" class="text-danger mt-1">
+        Organizaciona jedinica je obavezno polje.
+      </div>
+    </div>
+
+    <!-- Country -->
+    <div class="form-group mb-3">
+      <label for="country" class="form-label">Kod Države (C)</label>
+      <input type="text" id="country" class="form-control" formControlName="country" placeholder="Npr. RS">
+      <div *ngIf="isControlInvalid('country')" class="text-danger mt-1">
+        <div *ngIf="certificateForm.get('country')?.errors?.['required']">Kod države je obavezno polje.</div>
+        <div *ngIf="certificateForm.get('country')?.errors?.['pattern']">Unesite tačno 2 velika slova (npr. RS, US, DE).</div>
+      </div>
+    </div>
+
+    <!-- Email -->
+    <div class="form-group mb-3">
+      <label for="email" class="form-label">Email Adresa</label>
+      <input type="email" id="email" class="form-control" formControlName="email" placeholder="kontakt@mojakompanija.com">
+      <div *ngIf="isControlInvalid('email')" class="text-danger mt-1">
+        <div *ngIf="certificateForm.get('email')?.errors?.['required']">Email je obavezno polje.</div>
+        <div *ngIf="certificateForm.get('email')?.errors?.['email']">Unesite validnu email adresu.</div>
+      </div>
+    </div>
+
+    <!-- Valid From -->
+    <div class="form-group mb-3">
+      <label for="validFrom" class="form-label">Datum Početka Važenja</label>
+      <input type="datetime-local" id="validFrom" class="form-control" formControlName="validFrom">
+      <div *ngIf="isControlInvalid('validFrom')" class="text-danger mt-1">
+        Datum početka važenja je obavezno polje.
+      </div>
+    </div>
+
+    <!-- Valid To -->
+    <div class="form-group mb-3">
+      <label for="validTo" class="form-label">Datum Isteka Važenja</label>
+      <input type="datetime-local" id="validTo" class="form-control" formControlName="validTo">
+      <div *ngIf="isControlInvalid('validTo')" class="text-danger mt-1">
+        Datum isteka važenja je obavezno polje.
+      </div>
+    </div>
+
+    
+
+    <!-- Submit Button -->
+    <button type="submit" class="btn btn-primary" [disabled]="certificateForm.invalid">Kreiraj Sertifikat</button>
+
+  </form>
+</div>

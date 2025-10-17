@@ -8,14 +8,31 @@
     <a mat-button routerLink="/create-ca-user">
       <mat-icon>person_add</mat-icon> Create CA User
     </a>
+    <a mat-button routerLink="/create-root-certificate">
+      <mat-icon>security</mat-icon>
+      Create Root Certificate
+    </a>
+    <a mat-button routerLink="/create-intermediate-certificate">
+      <mat-icon>add_moderator</mat-icon> <!-- Primer ikone -->
+      Create Intermediate
+    </a>
   </ng-container>
 
-  <ng-container *ngIf="isCaUser$ | async">
-    <!-- stranice za ca korisnika -->
+
+   <ng-container *ngIf="isCaUser$ | async">
+    
+    <a mat-button routerLink="/create-intermediate-certificate">
+      <mat-icon>add_moderator</mat-icon> 
+      Create Intermediate
+    </a>
+   
   </ng-container>
 
   <ng-container *ngIf="isOrdinaryUser$ | async">
-     <!-- stranice za obicnog korisnika -->
+      <a mat-button routerLink="/certificate-request">
+      <mat-icon>post_add</mat-icon> <!-- Primer ikone -->
+      Submit Certificate Request
+    </a>
   </ng-container>
 
   <span class="spacer"></span>

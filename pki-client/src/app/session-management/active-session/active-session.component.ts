@@ -4,7 +4,7 @@ import { SessionManagementService } from '../session-managemen.service';
 import { ActiveSession, ParsedSession } from '../model/model.session';
 
 @Component({
-  selector: 'app-active-session', // Ažuriran selector
+  selector: 'app-active-session', 
   templateUrl: './active-session.component.html',
   styleUrls: ['./active-session.component.css']
 })
