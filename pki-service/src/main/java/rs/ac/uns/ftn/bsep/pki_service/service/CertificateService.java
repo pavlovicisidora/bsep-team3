@@ -443,22 +443,26 @@ public class CertificateService {
     }
 
     public byte[] generateCrl(String issuerAlias) throws Exception {
+        System.out.println("--- Generating CRL for alias: " + issuerAlias + " ---");
+
         CertificateData issuerData = certificateRepository.findAll().stream()
                 .filter(cert -> issuerAlias.equals(cert.getAlias()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with alias '" + issuerAlias + "' not found."));
 
-        if (!issuerData.isCa()) {
+        System.out.println("-> Found issuer in DB. Alias: " + issuerData.getAlias() + ", isCa: " + issuerData.isCa() + ", isRevoked: " + issuerData.isRevoked());
+
+        if (!issuerData.isCa())
             throw new IllegalArgumentException("The specified alias does not belong to a CA certificate.");
-        }
-        if (issuerData.isRevoked()) {
+
+        if (issuerData.isRevoked())
             throw new IllegalArgumentException("Cannot generate CRL from a revoked issuer.");
-        }
+
 
         X509Certificate issuerCert = keystoreService.readCertificate(issuerAlias);
         PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(
                 issuerAlias,
-                getDecryptedKeystorePassword(issuerData)
+                getDecryptedKeystorePassword(issuerData, issuerData.getOwner())
         );
 
         if (issuerCert == null || issuerPrivateKey == null) {
@@ -471,7 +475,8 @@ public class CertificateService {
         calendar.add(Calendar.DAY_OF_YEAR, 7);
         Date nextUpdate = calendar.getTime();
 
-        X509v2CRLBuilder crlBuilder = new X509v2CRLBuilder(X500Name.getInstance(issuerCert.getSubjectX500Principal()), now);
+        X500Name issuerX500Name = X500Name.getInstance(issuerCert.getSubjectX500Principal().getEncoded());
+        X509v2CRLBuilder crlBuilder = new X509v2CRLBuilder(issuerX500Name, now);
         crlBuilder.setNextUpdate(nextUpdate);
 
         List<CertificateData> revokedCerts = certificateRepository.findByIssuerDNAndIsRevokedTrue(issuerData.getSubjectDN());
@@ -536,6 +541,14 @@ public class CertificateService {
     // Pomoćna metoda za dobijanje dekriptovane lozinke
     private String getDecryptedKeystorePassword(CertificateData certData) throws Exception {
         String userSymmetricKey = getUserSymmetricKey();
+        return encryptionService.decrypt(certData.getKeystorePassword(), userSymmetricKey);
+    }
+
+    private String getDecryptedKeystorePassword(CertificateData certData, User owner) throws Exception {
+        String userSymmetricKey = owner.getUserSymmetricKey();
+        if (userSymmetricKey == null || userSymmetricKey.isEmpty()) {
+            throw new IllegalStateException("Certificate owner (ID: " + owner.getId() + ") does not have a symmetric key configured.");
+        }
         return encryptionService.decrypt(certData.getKeystorePassword(), userSymmetricKey);
     }
 

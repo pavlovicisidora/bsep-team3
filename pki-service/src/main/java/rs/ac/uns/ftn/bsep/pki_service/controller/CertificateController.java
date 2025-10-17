@@ -82,7 +82,7 @@ public class CertificateController {
     }
 
     @GetMapping(value = "/crl/{issuerAlias}", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
-    public ResponseEntity<byte[]> getCrl(@PathVariable String issuerAlias) {
+    public ResponseEntity<?> getCrl(@PathVariable String issuerAlias) {
         try {
             byte[] crlData = certificateService.generateCrl(issuerAlias);
 
@@ -94,10 +94,10 @@ public class CertificateController {
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
                     .body(crlData);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return new ResponseEntity<>("An unexpected error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
