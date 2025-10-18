@@ -57,7 +57,7 @@ public class CertificateController {
     }
 
     @PostMapping("/end-entity")
-    @PreAuthorize("hasAnyRole('ADMIN', 'CA_USER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'CA_USER', 'ORDINARY_USER')")
     public ResponseEntity<CertificateData> createEndEntityCertificate(
             @RequestPart("dto") CreateEeCertificateDto dto,
             @RequestPart("csrFile") MultipartFile csrFile) {

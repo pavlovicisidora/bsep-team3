@@ -372,7 +372,7 @@ public class CertificateService {
             certData.setValidTo(dto.getValidTo());
             certData.setCa(false);
             certData.setAlias(alias);
-            certData.setKeystorePassword(null);
+            certData.setKeystorePassword("");
             certData.setOwner(finalOwner);
 
             CertificateData savedCert = certificateRepository.save(certData);

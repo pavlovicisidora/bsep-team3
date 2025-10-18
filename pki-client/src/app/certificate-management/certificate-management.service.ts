@@ -93,16 +93,29 @@ export class CertificateManagementService {
   }
 
   createCertificateRequest(issuerSerialNumber: string, validTo: string, csrFile: File): Observable<any> {
-    
     const formData = new FormData();
 
-    
-    formData.append('csrFile', csrFile, csrFile.name);
-    formData.append('issuerSerialNumber', issuerSerialNumber);
-    formData.append('validTo', validTo);
+    // 1. Kreiramo DTO objekat koji backend očekuje.
+    const dto = {
+      issuerSerialNumber: issuerSerialNumber,
+      validTo: validTo
+    };
 
-    return this.http.post(this.requestApiUrl, formData);
-  }
+    // 2. Pretvaramo DTO objekat u JSON string i umotavamo ga u Blob.
+    // Ovo je ključno da bi Spring Boot ispravno pročitao 'dto' deo.
+    const dtoBlob = new Blob([JSON.stringify(dto)], { type: 'application/json' });
+
+    // 3. Dodajemo oba dela u FormData sa ispravnim imenima.
+    formData.append('dto', dtoBlob);
+    formData.append('csrFile', csrFile, csrFile.name);
+
+    // 4. Proveravamo da li je endpoint ispravan. Na osnovu tvog backend koda,
+    // on se nalazi u CertificateController-u i putanja je /end-entity.
+    const endpoint = `${this.certApiUrl}/end-entity`;
+
+    // Angular će automatski postaviti ispravan Content-Type za multipart/form-data.
+    return this.http.post(endpoint, formData);
+}
 
   // --- METODA ZA CA KORISNIKE ---
 
