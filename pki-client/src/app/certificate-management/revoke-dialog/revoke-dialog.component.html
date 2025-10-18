@@ -1,0 +1,21 @@
+<h1 mat-dialog-title>Revoke Certificate</h1>
+<h2 mat-dialog-subtitle>Sertifikat: {{ data.commonName }}</h2>
+
+<div mat-dialog-content>
+  <p>Please select a reason for revocation:</p>
+  <mat-form-field appearance="outline">
+    <mat-label>Revocation Reason</mat-label>
+    <mat-select [(ngModel)]="selectedReason" required>
+      <mat-option *ngFor="let reason of revocationReasons" [value]="reason">
+        {{ reason }}
+      </mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>
+
+<div mat-dialog-actions align="end">
+  <button mat-button (click)="onNoClick()">Cancel</button>
+  <button mat-raised-button color="warn" [mat-dialog-close]="selectedReason" [disabled]="!selectedReason">
+    Revoke
+  </button>
+</div>

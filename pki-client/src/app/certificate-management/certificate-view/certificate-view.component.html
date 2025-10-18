@@ -25,6 +25,7 @@
           <th>CA</th>
           <th>Povučen</th>
           <th>Vlasnik</th>
+          <th>Akcije</th> 
         </tr>
       </thead>
       <tbody>
@@ -36,16 +37,31 @@
           <td data-label="Važi Od">{{ cert.validFrom | date:'dd.MM.yyyy HH:mm' }}</td>
           <td data-label="Važi Do">{{ cert.validTo | date:'dd.MM.yyyy HH:mm' }}</td>
           <td data-label="CA">
-            <span [class.status-yes]="cert.isCa" [class.status-no]="!cert.isCa">
-              {{ cert.isCa ? 'Da' : 'Ne' }}
+            <span [class.status-yes]="cert.ca" [class.status-no]="!cert.ca">
+              {{ cert.ca ? 'Da' : 'Ne' }}
             </span>
           </td>
-          <td data-label="Povučen">
-            <span [class.status-yes]="cert.isRevoked" [class.status-no]="!cert.isRevoked">
-                {{ cert.isRevoked ? 'Da' : 'Ne' }}
+          <span [class.status-revoked]="cert.revoked" [class.status-active]="!cert.revoked">
+                {{ cert.revoked ? 'Da (' + cert.revocationReason + ')' : 'Ne' }}
             </span>
-          </td>
           <td data-label="Vlasnik">{{ cert.ownerUsername }}</td>
+          <td data-label="Akcije" class="actions-cell">
+            
+            <button mat-icon-button color="warn" 
+                    *ngIf="!cert.revoked" 
+                    (click)="openRevokeDialog(cert)"
+                    matTooltip="Revoke Certificate">
+              <mat-icon>block</mat-icon>
+            </button>
+
+            <button mat-icon-button color="primary" 
+                    *ngIf="cert.ca" 
+                    (click)="onDownloadCrl(cert.alias)"
+                    matTooltip="Download CRL">
+              <mat-icon>download</mat-icon>
+            </button>
+
+          </td>
         </tr>
       </tbody>
     </table>

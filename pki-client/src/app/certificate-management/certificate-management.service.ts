@@ -57,8 +57,9 @@ export interface CertificateDetailsDto {
   issuerCommonName: string;
   validFrom: string;
   validTo: string;
-  isCa: boolean;
-  isRevoked: boolean;
+  ca: boolean;
+  revoked: boolean;
+  revocationReason: string | null;
   ownerUsername: string;
   alias: string;
 }
@@ -127,5 +128,17 @@ export class CertificateManagementService {
 
   getAllCertificates(): Observable<CertificateDetailsDto[]> {
     return this.http.get<CertificateDetailsDto[]>(this.certApiUrl);
+  }
+
+  revokeCertificate(serialNumber: string, reason: string): Observable<any> {
+    const body = { reason: reason };
+    return this.http.post(`${this.certApiUrl}/${serialNumber}/revoke`, body, { responseType: 'text' });
+  }
+
+  // Metoda za preuzimanje CRL-a
+  downloadCrl(issuerAlias: string): Observable<Blob> {
+    return this.http.get(`${this.certApiUrl}/crl/${issuerAlias}`, {
+      responseType: 'blob'
+    });
   }
 }
