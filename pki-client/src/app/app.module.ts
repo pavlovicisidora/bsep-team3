@@ -38,6 +38,8 @@ import { IntermediateCertificateComponent } from './certificate-management/inter
 import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
 import { CertificateViewComponent } from './certificate-management/certificate-view/certificate-view.component';
 import { RevokeDialogComponent } from './certificate-management/revoke-dialog/revoke-dialog.component';
+import { CertificateRequestsComponent } from './certificate-management/certificate-requests/certificate-requests.component';
+import { CertificateHistoryComponent } from './certificate-management/certificate-history/certificate-history.component';
 
 
 
@@ -57,7 +59,9 @@ import { RevokeDialogComponent } from './certificate-management/revoke-dialog/re
     IntermediateCertificateComponent,
     EeCertificateComponent,
     CertificateViewComponent,
-    RevokeDialogComponent
+    RevokeDialogComponent,
+    CertificateRequestsComponent,
+    CertificateHistoryComponent
   ],
   imports: [
     BrowserModule,

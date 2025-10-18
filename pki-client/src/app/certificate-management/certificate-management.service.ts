@@ -29,6 +29,7 @@ export interface CreateIntermediateCertificateDto {
 export interface Issuer {
   serialNumber: string;
   commonName: string;
+  organization: string;
   validTo: string;
 }
 
@@ -63,6 +64,37 @@ export interface CertificateDetailsDto {
   ownerUsername: string;
   alias: string;
 }
+
+export interface Requester {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  // ... i ostala polja ako su potrebna
+}
+
+// Glavni interfejs koji se poklapa sa JSON odgovorom
+export interface CertificateRequestResponse {
+  id: number;
+  requester: Requester; // Ugnježdeni objekat
+  createdAt: string;
+  issuerSerialNumber: string;
+  requestedValidTo: string;
+  csrPem: string; // Sirovi PEM string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectionReason: string | null;
+}
+
+// Interfejs za parsirane CSR podatke koje ćemo mi kreirati na frontendu
+export interface CsrDetails {
+  commonName: string;
+  organization: string;
+  organizationalUnit: string;
+  country: string;
+  email: string;
+}
+
 
 @Injectable({
   providedIn: 'root'
@@ -112,11 +144,34 @@ export class CertificateManagementService {
 
     // 4. Proveravamo da li je endpoint ispravan. Na osnovu tvog backend koda,
     // on se nalazi u CertificateController-u i putanja je /end-entity.
-    const endpoint = `${this.certApiUrl}/end-entity`;
+    const endpoint = `${this.requestApiUrl}`;
 
     // Angular će automatski postaviti ispravan Content-Type za multipart/form-data.
     return this.http.post(endpoint, formData);
 }
+
+
+
+ getPendingRequests(): Observable<CertificateRequestResponse[]> {
+    return this.http.get<CertificateRequestResponse[]>(`${this.requestApiUrl}/pending`);
+  }
+
+  
+  approveRequest(requestId: number): Observable<any> {
+    return this.http.post(`${this.requestApiUrl}/${requestId}/approve`, {});
+  }
+
+ 
+  rejectRequest(requestId: number, reason: string): Observable<void> {
+    return this.http.post<void>(`${this.requestApiUrl}/${requestId}/reject`, { reason });
+  }
+
+
+  getMyRequests(): Observable<CertificateRequestResponse[]> {
+    return this.http.get<CertificateRequestResponse[]>(`${this.requestApiUrl}/my-requests`);
+  }
+
+
 
   // --- METODA ZA CA KORISNIKE ---
 

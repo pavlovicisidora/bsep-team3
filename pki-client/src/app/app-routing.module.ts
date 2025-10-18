@@ -11,6 +11,9 @@ import { ActiveSessionComponent } from './session-management/active-session/acti
 import { RootCertificateComponent } from './certificate-management/root-certificate/root-certificate.component'; 
 import { IntermediateCertificateComponent } from './certificate-management/intermediate-certificate/intermediate-certificate.component';
 import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
+import { CertificateRequestsComponent } from './certificate-management/certificate-requests/certificate-requests.component';
+import { CertificateHistoryComponent } from './certificate-management/certificate-history/certificate-history.component';
+
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -54,11 +57,26 @@ const routes: Routes = [
     canActivate: [AuthGuard],
     data: { expectedRoles: ['ADMIN', 'CA_USER'] } 
   },
+
+  {
+    path: 'certificate-requests',
+    component: CertificateRequestsComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ADMIN', 'CA_USER'] } // Dostupno za Admina i CA korisnike
+  },
+
   {
     path: 'certificate-request',
     component: EeCertificateComponent,
     canActivate: [AuthGuard],
     data: { expectedRoles: ['ORDINARY_USER'] } // Samo za obične korisnike
+  },
+
+  {
+    path: 'my-requests-history',
+    component: CertificateHistoryComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ORDINARY_USER'] }
   },
       
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
