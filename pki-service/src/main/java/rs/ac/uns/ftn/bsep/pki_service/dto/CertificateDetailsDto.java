@@ -4,6 +4,7 @@ package rs.ac.uns.ftn.bsep.pki_service.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import rs.ac.uns.ftn.bsep.pki_service.model.enums.RevocationReason;
 
 import java.util.Date;
 
@@ -19,6 +20,7 @@ public class CertificateDetailsDto {
     private Date validTo;
     private boolean isCa;
     private boolean isRevoked;
+    private RevocationReason revocationReason;
     private String ownerUsername;
     private String alias;
 }
