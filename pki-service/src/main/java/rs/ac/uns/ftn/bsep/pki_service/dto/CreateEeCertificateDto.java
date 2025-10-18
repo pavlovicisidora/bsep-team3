@@ -7,4 +7,5 @@ import java.util.Date;
 public class CreateEeCertificateDto {
     private String issuerSerialNumber;
     private Date validTo;
+    private Long templateId;
 }

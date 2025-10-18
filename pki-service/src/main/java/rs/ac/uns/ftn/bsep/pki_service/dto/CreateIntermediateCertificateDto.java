@@ -42,4 +42,6 @@ public class CreateIntermediateCertificateDto {
 
     @NotNull(message = "Certificate OwnerId is required.")
     private Long ownerId;
+
+    private Long templateId;
 }
