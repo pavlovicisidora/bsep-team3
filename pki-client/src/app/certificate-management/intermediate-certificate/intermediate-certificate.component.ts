@@ -102,8 +102,8 @@ export class IntermediateCertificateComponent implements OnInit {
       organizationalUnit: ['', Validators.required],
       country: ['', [Validators.required, Validators.pattern(/^[A-Z]{2}$/)]],
       email: ['', [Validators.required, Validators.email]],
-      validFrom: ['', [Validators.required, notInPastValidator()]],
-      validTo: ['', [Validators.required, notInPastValidator()]],
+      validFrom: ['', [Validators.required]],
+      validTo: ['', [Validators.required]],
       ownerId: [null, this.isAdmin ? Validators.required : []]
     }, {
       validators: dateRangeValidator('validFrom', 'validTo')
