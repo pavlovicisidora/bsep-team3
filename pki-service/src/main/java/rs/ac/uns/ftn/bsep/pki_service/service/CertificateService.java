@@ -123,6 +123,7 @@ public class CertificateService {
                 cert.getValidTo(),
                 cert.isCa(),
                 cert.isRevoked(),
+                cert.getRevocationReason(),
                 cert.getOwner().getUsername(),
                 cert.getAlias()
         )).collect(Collectors.toList());
@@ -154,6 +155,8 @@ public class CertificateService {
 
             JcaX509v3CertificateBuilder certificateBuilder = new JcaX509v3CertificateBuilder(
                     subjectAndIssuer, serialNumber, dto.getValidFrom(), dto.getValidTo(), subjectAndIssuer, publicKey);
+            String alias = generateAlias(dto.getCommonName(), serialNumber);
+            certificateBuilder.addExtension(Extension.cRLDistributionPoints, false, createCrlDistributionPointsExtension(alias));
 
             certificateBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
             certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
@@ -165,7 +168,6 @@ public class CertificateService {
 
             String randomPassword = generateRandomPassword(16);
             String encryptedPassword = encryptionService.encrypt(randomPassword,userSymmetricKey);
-            String alias = generateAlias(dto.getCommonName(), serialNumber);
             keystoreService.saveCertificate(certificate, privateKey, alias, randomPassword);
             log.info("Certificate and private key saved to keystore under alias: {}", alias);
 
@@ -264,12 +266,8 @@ public class CertificateService {
             certificate.verify(issuerCertificate.getPublicKey());
             log.info("Intermediate certificate for CN: {} created and verified successfully.", dto.getCommonName());
 
-            String randomPassword = generateRandomPassword(16);
-            String encryptedPassword = encryptionService.encrypt(randomPassword, getUserSymmetricKey());
-
             String alias = generateAlias(dto.getCommonName(), serialNumber);
             X509Certificate[] chain = {certificate, issuerCertificate};
-            keystoreService.saveCertificateChain(chain, privateKey, alias, randomPassword);
             log.info("Certificate chain saved to keystore under alias: {}", alias);
 
             User owner = currentUser;
@@ -278,6 +276,10 @@ public class CertificateService {
                         .orElseThrow(() -> new IllegalArgumentException("User with specified ownerId not found."));
             }
 
+            String randomPassword = generateRandomPassword(16);
+            String encryptedPassword = encryptionService.encrypt(randomPassword, getUserSymmetricKey(owner));
+
+            keystoreService.saveCertificateChain(chain, privateKey, alias, randomPassword);
             CertificateData certData = new CertificateData();
             certData.setSerialNumber(serialNumber);
             certData.setSubjectDN(certificate.getSubjectX500Principal().getName());
@@ -517,6 +519,14 @@ public class CertificateService {
         String userSymmetricKey = currentUser.getUserSymmetricKey();
         if (userSymmetricKey == null || userSymmetricKey.isEmpty()) {
             throw new IllegalStateException("Currently logged in user does not have a symmetric key configured.");
+        }
+        return userSymmetricKey;
+    }
+
+    private String getUserSymmetricKey(User owner) {
+        String userSymmetricKey = owner.getUserSymmetricKey();
+        if (userSymmetricKey == null || userSymmetricKey.isEmpty()) {
+            throw new IllegalStateException("Owner does not have a symmetric key configured.");
         }
         return userSymmetricKey;
     }

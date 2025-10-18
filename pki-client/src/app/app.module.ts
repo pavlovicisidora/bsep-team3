@@ -23,6 +23,8 @@ import { NgxCaptchaModule } from 'ngx-captcha';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { MatToolbarModule } from '@angular/material/toolbar'; 
 import { MatIconModule } from '@angular/material/icon';
+import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { ForgotPasswordDialogComponent } from './auth/forgot-password-dialog/forgot-password-dialog.component';
 import { ResetPasswordComponent } from './auth/reset-password/reset-password.component';
@@ -35,6 +37,7 @@ import { RootCertificateComponent } from './certificate-management/root-certific
 import { IntermediateCertificateComponent } from './certificate-management/intermediate-certificate/intermediate-certificate.component';
 import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
 import { CertificateViewComponent } from './certificate-management/certificate-view/certificate-view.component';
+import { RevokeDialogComponent } from './certificate-management/revoke-dialog/revoke-dialog.component';
 
 
 
@@ -53,7 +56,8 @@ import { CertificateViewComponent } from './certificate-management/certificate-v
     RootCertificateComponent,
     IntermediateCertificateComponent,
     EeCertificateComponent,
-    CertificateViewComponent
+    CertificateViewComponent,
+    RevokeDialogComponent
   ],
   imports: [
     BrowserModule,
@@ -72,8 +76,10 @@ import { CertificateViewComponent } from './certificate-management/certificate-v
     HttpClientModule,
     FormsModule,
     MatDialogModule,
+    MatSelectModule,
     MatSnackBarModule, 
-    HttpClientModule
+    MatTooltipModule,
+    HttpClientModule,
 
   ],
   providers: [
