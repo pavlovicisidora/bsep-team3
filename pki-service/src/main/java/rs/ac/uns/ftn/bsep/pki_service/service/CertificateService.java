@@ -388,39 +388,52 @@ public class CertificateService {
     }
 
     public void revokeCertificate(BigInteger serialNumber, RevocationReason reason) {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("AUDIT: User '{}' is attempting to revoke certificate with serial number: {}. Reason: {}",
+                currentUser.getUsername(), serialNumber, reason);
+
         CertificateData certToRevoke = certificateRepository.findBySerialNumber(serialNumber)
-                .orElseThrow(() -> new IllegalArgumentException("Certificate with serial number " + serialNumber + " not found."));
+                .orElseThrow(() -> {
+                    log.warn("Revocation failed. Certificate with serial number {} not found.", serialNumber);
+                    return new IllegalArgumentException("Certificate with serial number " + serialNumber + " not found.");
+                });
 
         if (certToRevoke.isRevoked()) {
+            log.warn("Revocation failed. Certificate {} is already revoked.", serialNumber);
             throw new IllegalArgumentException("Certificate is already revoked.");
         }
 
-        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         boolean isAdmin = currentUser.getRole().equals(UserRole.ADMIN);
 
         if (!isAdmin && !certToRevoke.getOwner().getId().equals(currentUser.getId())) {
+            log.warn("SECURITY: User '{}' does not have permission to revoke certificate {}.", currentUser.getUsername(), serialNumber);
             throw new SecurityException("You do not have permission to revoke this certificate.");
         }
 
+        log.info("Permission granted. Proceeding to revoke certificate {} and its chain.", serialNumber);
         revokeChain(certToRevoke, reason);
     }
 
     public byte[] generateCrl(String issuerAlias) throws Exception {
-        System.out.println("--- Generating CRL for alias: " + issuerAlias + " ---");
+        log.info("CRL_GENERATION: Starting process for issuer alias: {}", issuerAlias);
 
         CertificateData issuerData = certificateRepository.findAll().stream()
                 .filter(cert -> issuerAlias.equals(cert.getAlias()))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Issuer with alias '" + issuerAlias + "' not found."));
-
-        System.out.println("-> Found issuer in DB. Alias: " + issuerData.getAlias() + ", isCa: " + issuerData.isCa() + ", isRevoked: " + issuerData.isRevoked());
-
-        if (!issuerData.isCa())
+                .orElseThrow(() -> {
+                    log.warn("CRL generation failed. Issuer with alias '{}' not found in database.", issuerAlias);
+                    return new IllegalArgumentException("Issuer with alias '" + issuerAlias + "' not found.");
+                });
+        log.info("-> Found issuer in DB. Alias: {}, isCa: {}, isRevoked: {}", issuerData.getAlias(), issuerData.isCa(), issuerData.isRevoked());
+        if (!issuerData.isCa()) {
+            log.warn("CRL generation failed for alias '{}'. Reason: Certificate is not a CA.", issuerAlias);
             throw new IllegalArgumentException("The specified alias does not belong to a CA certificate.");
+        }
 
-        if (issuerData.isRevoked())
+        if (issuerData.isRevoked()) {
+            log.warn("CRL generation failed for alias '{}'. Reason: Issuer certificate is revoked.", issuerAlias);
             throw new IllegalArgumentException("Cannot generate CRL from a revoked issuer.");
-
+        }
 
         X509Certificate issuerCert = keystoreService.readCertificate(issuerAlias);
         PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(
@@ -429,6 +442,7 @@ public class CertificateService {
         );
 
         if (issuerCert == null || issuerPrivateKey == null) {
+            log.error("CRITICAL: Could not load issuer's certificate or private key from keystore for alias '{}'.", issuerAlias);
             throw new RuntimeException("Could not load issuer's certificate or private key from keystore.");
         }
 
@@ -443,6 +457,7 @@ public class CertificateService {
         crlBuilder.setNextUpdate(nextUpdate);
 
         List<CertificateData> revokedCerts = certificateRepository.findByIssuerDNAndIsRevokedTrue(issuerData.getSubjectDN());
+        log.info("Found {} revoked certificates issued by '{}' to add to the CRL.", revokedCerts.size(), issuerAlias);
 
         for (CertificateData revokedCert : revokedCerts) {
             crlBuilder.addCRLEntry(
@@ -459,7 +474,8 @@ public class CertificateService {
         X509CRLHolder crlHolder = crlBuilder.build(contentSigner);
 
         X509CRL crl = new JcaX509CRLConverter().setProvider("BC").getCRL(crlHolder);
-
+        
+        log.info("CRL_GENERATION: Successfully generated CRL for issuer alias: {}", issuerAlias);
         return crl.getEncoded();
     }
 
@@ -473,7 +489,7 @@ public class CertificateService {
         certData.setRevocationDate(new Date());
         certificateRepository.save(certData);
 
-        System.out.println("Revoked certificate with SN: " + certData.getSerialNumber());
+        log.info("Revoked certificate with SN: {}", certData.getSerialNumber());
 
         if (certData.isCa()) {
             List<CertificateData> issuedCertificates = certificateRepository.findByIssuerDN(certData.getSubjectDN());
