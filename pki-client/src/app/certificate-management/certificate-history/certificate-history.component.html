@@ -1,0 +1,46 @@
+<app-navbar></app-navbar>
+<div class="container">
+  <h2>Istorija mojih zahteva</h2>
+
+  <div *ngIf="isLoading" class="loading-indicator">
+    <p>Učitavanje zahteva...</p>
+  </div>
+
+  <div *ngIf="errorMessage" class="error-message">
+    <p>{{ errorMessage }}</p>
+  </div>
+
+  <div *ngIf="!isLoading && !errorMessage">
+    <table class="history-table" *ngIf="myRequests.length > 0; else noRequests">
+      <thead>
+        <tr>
+          <th>Datum podnošenja</th>
+          <th>Serijski broj izdavaoca</th>
+          <th>Status</th>
+          <th>Razlog odbijanja</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let request of myRequests">
+          <td>{{ request.createdAt | date:'dd.MM.yyyy HH:mm' }}</td>
+          <td>{{ request.issuerSerialNumber }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(request.status)">
+              {{ request.status }}
+            </span>
+          </td>
+          <td>
+            <!-- Prikazuje se samo ako postoji razlog odbijanja -->
+            <span *ngIf="request.rejectionReason">{{ request.rejectionReason }}</span>
+            <span *ngIf="!request.rejectionReason" class="no-reason">-</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <!-- Prikazuje se ako korisnik nema nijedan zahtev -->
+    <ng-template #noRequests>
+      <p>Niste podneli nijedan zahtev za sertifikat.</p>
+    </ng-template>
+  </div>
+</div>
