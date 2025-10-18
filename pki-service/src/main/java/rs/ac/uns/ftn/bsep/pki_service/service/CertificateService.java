@@ -1,12 +1,15 @@
 package rs.ac.uns.ftn.bsep.pki_service.service;
 
 import lombok.RequiredArgsConstructor;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.pkcs.Attribute;
+import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
+import org.bouncycastle.asn1.x500.RDN;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
-import org.bouncycastle.asn1.x509.BasicConstraints;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.KeyUsage;
+import org.bouncycastle.asn1.x500.style.IETFUtils;
+import org.bouncycastle.asn1.x509.*;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;
@@ -29,16 +32,13 @@ import rs.ac.uns.ftn.bsep.pki_service.dto.CreateIntermediateCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CreateRootCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.IssuerDto;
 import rs.ac.uns.ftn.bsep.pki_service.model.CertificateData;
+import rs.ac.uns.ftn.bsep.pki_service.model.Template;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.RevocationReason;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
 import rs.ac.uns.ftn.bsep.pki_service.repository.CertificateRepository;
+import rs.ac.uns.ftn.bsep.pki_service.repository.TemplateRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
-import org.bouncycastle.asn1.x509.DistributionPoint;
-import org.bouncycastle.asn1.x509.DistributionPointName;
-import org.bouncycastle.asn1.x509.GeneralName;
-import org.bouncycastle.asn1.x509.GeneralNames;
-import org.bouncycastle.asn1.x509.CRLDistPoint;
 
 import java.io.InputStreamReader;
 import java.math.BigInteger;
@@ -48,6 +48,7 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509CRL;
 import java.security.cert.X509Certificate;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,6 +59,7 @@ public class CertificateService {
     private final KeystoreService keystoreService;
     private final EncryptionService encryptionService;
     private final UserRepository userRepository;
+    private final TemplateRepository templateRepository;
 
     public List<IssuerDto> getAvailableIssuers() {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -190,6 +192,28 @@ public class CertificateService {
                 throw new IllegalArgumentException("Issuer certificate not found.");
             }
             CertificateData issuerData = issuerDataOptional.get();
+
+            if (dto.getTemplateId() != null) {
+                Template template = templateRepository.findById(dto.getTemplateId())
+                        .orElseThrow(() -> new IllegalArgumentException("Template not found."));
+
+                // Validacija 1: Da li se issuer iz DTO-a poklapa sa onim iz šablona?
+                if (!template.getIssuer().getSerialNumber().equals(issuerData.getSerialNumber())) {
+                    throw new IllegalArgumentException("Selected issuer does not match the issuer defined in the template.");
+                }
+
+                // Validacija 2: Da li CN (Common Name) zadovoljava regex iz šablona?
+                if (!dto.getCommonName().matches(template.getCommonNameRegex())) {
+                    throw new IllegalArgumentException("Common Name does not match the template's validation rules.");
+                }
+
+                // Validacija 3: Da li je trajanje sertifikata u okviru TTL-a iz šablona?
+                long requestedDurationMillis = dto.getValidTo().getTime() - dto.getValidFrom().getTime();
+                long maxDurationMillis = TimeUnit.DAYS.toMillis(template.getTimeToLiveDays());
+                if (requestedDurationMillis > maxDurationMillis) {
+                    throw new IllegalArgumentException("Certificate duration exceeds the template's maximum Time-To-Live.");
+                }
+            }
 
             assert currentUser != null;
             if (UserRole.CA_USER.equals(currentUser.getRole()) && !issuerData.getOwner().getId().equals(currentUser.getId())) {
@@ -331,6 +355,8 @@ public class CertificateService {
             }
             CertificateData issuerData = issuerDataOptional.get();
 
+
+
             if (UserRole.CA_USER.equals(currentUser.getRole()) && !issuerData.getOwner().getId().equals(currentUser.getId())) {
                 throw new SecurityException("CA user can only use certificates they own.");
             }
@@ -347,25 +373,63 @@ public class CertificateService {
                 throw new IllegalArgumentException("Validity of the new certificate must be within the validity of the issuer certificate.");
             }
 
+            PKCS10CertificationRequest csr = parseCsr(csrFile);
+            if (!isCsrSignatureValid(csr)) {
+                throw new IllegalArgumentException("CSR signature is not valid.");
+            }
+            X500Name subject = csr.getSubject();
+            PublicKey subjectPublicKey = new JcaPKCS10CertificationRequest(csr).getPublicKey();
+
+            Template template = null;
+            if (dto.getTemplateId() != null) {
+                template = templateRepository.findById(dto.getTemplateId())
+                        .orElseThrow(() -> new IllegalArgumentException("Template not found."));
+
+                // Validacija 1: Da li se issuer iz DTO-a poklapa sa onim iz šablona?
+                if (!template.getIssuer().getSerialNumber().equals(issuerData.getSerialNumber())) {
+                    throw new IllegalArgumentException("Selected issuer does not match the issuer defined in the template.");
+                }
+
+                // Validacija 2: Da li trajanje sertifikata poštuje TTL iz šablona?
+                long requestedDurationMillis = dto.getValidTo().getTime() - validFrom.getTime();
+                long maxDurationMillis = TimeUnit.DAYS.toMillis(template.getTimeToLiveDays());
+                if (requestedDurationMillis > maxDurationMillis) {
+                    throw new IllegalArgumentException("Certificate duration exceeds the template's maximum Time-To-Live.");
+                }
+
+                // Validacija 3: Da li CN (Common Name) iz CSR-a zadovoljava regex iz šablona?
+                String commonNameFromCsr = extractCommonNameFromX500(subject);
+                if (commonNameFromCsr == null || !commonNameFromCsr.matches(template.getCommonNameRegex())) {
+                    throw new IllegalArgumentException("Common Name from CSR does not match the template's validation rules.");
+                }
+
+                if (template.getSubjectAlternativeNamesRegex() != null && !template.getSubjectAlternativeNamesRegex().isEmpty()) {
+                    Attribute[] attributes = csr.getAttributes(PKCSObjectIdentifiers.pkcs_9_at_extensionRequest);
+                    if (attributes.length > 0) {
+                        Extensions extensions = Extensions.getInstance(attributes[0].getAttrValues().getObjectAt(0));
+                        GeneralNames san = GeneralNames.fromExtensions(extensions, Extension.subjectAlternativeName);
+
+                        if (san != null) {
+                            for (GeneralName name : san.getNames()) {
+                                if (name.getTagNo() == GeneralName.dNSName) {
+                                    String dnsName = name.getName().toString();
+                                    if (!dnsName.matches(template.getSubjectAlternativeNamesRegex())) {
+                                        throw new IllegalArgumentException("A Subject Alternative Name (" + dnsName + ") from CSR does not match the template's validation rules.");
+                                    }
+                                }
+                                // Ovde se mogu dodati i provere za druge tipove imena ako je potrebno (IP adrese, email, itd.)
+                            }
+                        }
+                    }
+                }
+            }
+
             // --- KORAK 2: Učitavanje privatnog ključa izdavaoca (isto kao za Intermediate) ---
             PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(
                     issuerData.getAlias(),
                     getDecryptedKeystorePassword(issuerData)
             );
             if (issuerPrivateKey == null) throw new RuntimeException("Could not load issuer's private key.");
-
-
-            // --- KORAK 3: Parsiranje i validacija CSR-a ---
-            PKCS10CertificationRequest csr = parseCsr(csrFile);
-
-            // Validacija potpisa na CSR-u da bismo bili sigurni da nije menjan
-            if (!isCsrSignatureValid(csr)) {
-                throw new IllegalArgumentException("CSR signature is not valid.");
-            }
-
-            X500Name subject = csr.getSubject();
-            PublicKey subjectPublicKey = new JcaPKCS10CertificationRequest(csr).getPublicKey();
-
 
             // --- KORAK 4: Konstrukcija i potpisivanje sertifikata ---
             BigInteger serialNumber = new BigInteger(64, new SecureRandom());
@@ -382,10 +446,22 @@ public class CertificateService {
 
             // Ključna razlika: BasicConstraints je false za EE sertifikate
             certificateBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
-            // Primer KeyUsage za SSL/TLS server sertifikat
-            certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
-
             certificateBuilder.addExtension(Extension.cRLDistributionPoints, false, createCrlDistributionPointsExtension(issuerData.getAlias()));
+
+            if (template != null) {
+                // Ako koristimo šablon, primeni vrednosti iz njega
+                // 1. Key Usage
+                if (template.getKeyUsage() != null && !template.getKeyUsage().isEmpty()) {
+                    certificateBuilder.addExtension(Extension.keyUsage, true, buildKeyUsageFromTemplate(template.getKeyUsage()));
+                }
+                // 2. Extended Key Usage
+                if (template.getExtendedKeyUsage() != null && !template.getExtendedKeyUsage().isEmpty()) {
+                    certificateBuilder.addExtension(Extension.extendedKeyUsage, false, buildExtendedKeyUsageFromTemplate(template.getExtendedKeyUsage()));
+                }
+            } else {
+                // Fallback logika ako se ne koristi šablon
+                certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+            }
 
             ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
                     .setProvider("BC")
@@ -498,6 +574,76 @@ public class CertificateService {
         X509CRL crl = new JcaX509CRLConverter().setProvider("BC").getCRL(crlHolder);
 
         return crl.getEncoded();
+    }
+
+    private KeyUsage buildKeyUsageFromTemplate(String keyUsageString) {
+        int keyUsageFlags = 0;
+        String[] usages = keyUsageString.split(",");
+        for (String usage : usages) {
+            switch (usage.trim().toLowerCase()) {
+                case "digitalsignature": keyUsageFlags |= KeyUsage.digitalSignature; break;
+                case "nonrepudiation": keyUsageFlags |= KeyUsage.nonRepudiation; break;
+                case "keyencipherment": keyUsageFlags |= KeyUsage.keyEncipherment; break;
+                case "dataencipherment": keyUsageFlags |= KeyUsage.dataEncipherment; break;
+                case "keyagreement": keyUsageFlags |= KeyUsage.keyAgreement; break;
+                case "keycertsign": keyUsageFlags |= KeyUsage.keyCertSign; break;
+                case "crlsign": keyUsageFlags |= KeyUsage.cRLSign; break;
+                case "encipheronly": keyUsageFlags |= KeyUsage.encipherOnly; break;
+                case "decipheronly": keyUsageFlags |= KeyUsage.decipherOnly; break;
+            }
+        }
+        return new KeyUsage(keyUsageFlags);
+    }
+
+    private ExtendedKeyUsage buildExtendedKeyUsageFromTemplate(String extendedKeyUsageString) {
+        List<KeyPurposeId> purposes = new ArrayList<>();
+        String[] purposeValues = extendedKeyUsageString.split(",");
+
+        for (String value : purposeValues) {
+            String trimmedValue = value.trim();
+            if (trimmedValue.isEmpty()) {
+                continue;
+            }
+
+            switch (trimmedValue.toLowerCase()) {
+                case "serverauth":
+                    purposes.add(KeyPurposeId.id_kp_serverAuth);
+                    break;
+                case "clientauth":
+                    purposes.add(KeyPurposeId.id_kp_clientAuth);
+                    break;
+                case "codesigning":
+                    purposes.add(KeyPurposeId.id_kp_codeSigning);
+                    break;
+                case "emailprotection":
+                    purposes.add(KeyPurposeId.id_kp_emailProtection);
+                    break;
+                case "timestamping":
+                    purposes.add(KeyPurposeId.id_kp_timeStamping);
+                    break;
+                case "ocspsigning":
+                    purposes.add(KeyPurposeId.id_kp_OCSPSigning);
+                    break;
+                default:
+                    try {
+                        purposes.add(KeyPurposeId.getInstance(new ASN1ObjectIdentifier(trimmedValue)));
+                    } catch (IllegalArgumentException e) {
+                        System.err.println("Warning: Skipping invalid or unsupported Extended Key Usage value: '" + trimmedValue + "'");
+                    }
+                    break;
+            }
+        }
+
+        if (purposes.isEmpty()) {
+            throw new IllegalArgumentException("ExtendedKeyUsage string resulted in no valid purposes.");
+        }
+
+        return new ExtendedKeyUsage(purposes.toArray(new KeyPurposeId[0]));
+    }
+
+    private String extractCommonNameFromX500(X500Name x500Name) {
+        RDN cnRdn = Arrays.stream(x500Name.getRDNs(BCStyle.CN)).findFirst().orElse(null);
+        return (cnRdn != null) ? IETFUtils.valueToString(cnRdn.getFirst().getValue()) : null;
     }
 
     private void revokeChain(CertificateData certData, RevocationReason reason) {
