@@ -25,7 +25,7 @@ public class SessionCleanupTask {
     public void cleanupExpiredSessions() {
         log.info("ZAKAZANI ZADATAK: Pokretanje čišćenja isteklih sesija...");
 
-        int deletedCount = sessionRepository.deleteByExpiresAtBefore(new Date());
+        int deletedCount = sessionRepository.deleteExpiredSessions(new Date());
 
         if (deletedCount > 0) {
             log.info("ZAKAZANI ZADATAK: Obrisano {} isteklih sesija.", deletedCount);

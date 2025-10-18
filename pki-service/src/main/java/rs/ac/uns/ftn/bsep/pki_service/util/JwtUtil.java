@@ -1,10 +1,13 @@
 package rs.ac.uns.ftn.bsep.pki_service.util;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j; // <-- DODATO
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -15,6 +18,7 @@ import java.util.*;
 import java.util.function.Function;
 
 @Component
+@Slf4j // <-- DODATO
 public class JwtUtil {
 
     @Value("${jwt.secret}")
@@ -76,7 +80,12 @@ public class JwtUtil {
     }
 
     private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        // isTokenExpired sada može da vrati true i ako je token nevalidan, što je sigurno ponašanje
+        Date expirationDate = extractExpiration(token);
+        if (expirationDate == null) {
+            return true;
+        }
+        return expirationDate.before(new Date());
     }
 
     public Date extractExpiration(String token) {
@@ -88,9 +97,11 @@ public class JwtUtil {
      */
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
+        if (claims == null) {
+            return null; // Ako su claimovi null, vrati null
+        }
         return claimsResolver.apply(claims);
     }
-
 
     /**
      * Glavna metoda za parsiranje tokena.
@@ -99,11 +110,20 @@ public class JwtUtil {
      * @return Svi podaci (claims) iz tokena
      */
     private Claims extractAllClaims(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(secretKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(secretKey)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT token has expired: {}", e.getMessage());
+        } catch (SignatureException e) {
+            log.warn("JWT signature validation failed: {}", e.getMessage());
+        } catch (Exception e) {
+            log.warn("Invalid JWT token: {}", e.getMessage());
+        }
+        return null; // Vrati null ako parsiranje ne uspe iz bilo kog razloga
     }
 
 }

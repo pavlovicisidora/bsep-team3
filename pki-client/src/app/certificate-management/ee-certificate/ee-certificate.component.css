@@ -1,0 +1,103 @@
+:host {
+  --primary-color: #007bff;
+  --secondary-color: #6c757d;
+  --border-color: #ced4da;
+  --danger-color: #dc3545;
+}
+
+.container {
+  max-width: 700px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-top: 5px solid var(--primary-color);
+}
+
+.loading-container {
+  padding: 3rem;
+  text-align: center;
+  font-size: 1.2rem;
+  color: var(--secondary-color);
+}
+
+h2, p {
+  text-align: center;
+}
+
+hr {
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.form-control:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.text-danger {
+  color: var(--danger-color);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Stilovi za file upload */
+.d-none {
+  display: none;
+}
+
+.file-upload-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.file-name {
+  color: #495057;
+  font-style: italic;
+}
+
+/* Stilovi za dugmad */
+.btn {
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  border-radius: 5px;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.btn-primary {
+  width: 100%;
+  font-size: 1.1rem;
+  color: #fff;
+  background-color: var(--primary-color);
+}
+
+.btn-secondary {
+    color: #fff;
+    background-color: var(--secondary-color);
+}
+
+.btn:disabled {
+  background-color: #a0c7ff;
+  cursor: not-allowed;
+}

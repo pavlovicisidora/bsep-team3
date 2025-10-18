@@ -1,6 +1,7 @@
 package rs.ac.uns.ftn.bsep.pki_service.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
 import org.bouncycastle.asn1.pkcs.Attribute;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
@@ -17,20 +18,18 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.ContentVerifierProvider;
+import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
+import org.bouncycastle.pkcs.PKCSException;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequest;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemReader;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import rs.ac.uns.ftn.bsep.pki_service.dto.CreateEeCertificateDto;
-import rs.ac.uns.ftn.bsep.pki_service.dto.CreateIntermediateCertificateDto;
-import rs.ac.uns.ftn.bsep.pki_service.dto.CreateRootCertificateDto;
-import rs.ac.uns.ftn.bsep.pki_service.dto.IssuerDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.*;
 import rs.ac.uns.ftn.bsep.pki_service.model.CertificateData;
 import rs.ac.uns.ftn.bsep.pki_service.model.Template;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
@@ -40,9 +39,11 @@ import rs.ac.uns.ftn.bsep.pki_service.repository.CertificateRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.TemplateRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
 
-import java.io.InputStreamReader;
+import java.io.IOException;
+import java.io.StringReader;
 import java.math.BigInteger;
 import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509CRL;
@@ -53,6 +54,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CertificateService {
 
     private final CertificateRepository certificateRepository;
@@ -63,44 +65,79 @@ public class CertificateService {
 
     public List<IssuerDto> getAvailableIssuers() {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("Fetching available issuers for user: {}", currentUser.getUsername());
         List<CertificateData> potentialIssuers;
 
-        if (currentUser.getRole().equals(UserRole.ADMIN)) {
-            // Admin vidi sve validne CA sertifikate
+        assert currentUser != null;
+        if (currentUser.getRole().equals(UserRole.ORDINARY_USER)) {
+            Date now = new Date();
+            potentialIssuers = certificateRepository.findByIsCaTrueAndIsRevokedFalseAndValidFromBeforeAndValidToAfter(now, now);
+        }
+        else  if (currentUser.getRole().equals(UserRole.ADMIN)) {
             potentialIssuers = certificateRepository.findByIsCaTrueAndIsRevokedFalse();
-        } else {
-            // CA korisnik vidi samo svoje validne CA sertifikate
+        } else  {
             potentialIssuers = certificateRepository.findByIsCaTrueAndIsRevokedFalseAndOwner(currentUser);
         }
 
         return potentialIssuers.stream()
                 .map(cert -> new IssuerDto(
                         cert.getSerialNumber().toString(),
-                        extractCommonName(cert.getSubjectDN()), // Pomoćna metoda
-                        cert.getAlias()))
+                        extractFieldFromDn(cert.getSubjectDN(), "CN="),
+                        extractFieldFromDn(cert.getSubjectDN(), "O="),
+                        cert.getValidTo()))
                 .collect(Collectors.toList());
     }
 
-    // Pomoćna metoda za izvlačenje Common Name iz DN stringa
-    private String extractCommonName(String dn) {
-        // Ovo je jednostavna implementacija, za produkciju razmislite o korišćenju biblioteke
+    private String extractFieldFromDn(String dn, String field) {
+        String prefix = field + "=";
         for (String part : dn.split(",")) {
-            if (part.trim().startsWith("CN=")) {
-                return part.trim().substring(3);
+            part = part.trim();
+            if (part.startsWith(prefix)) {
+                return part.substring(prefix.length());
             }
         }
-        return "Unknown";
+        return "N/A";
+    }
+
+    public List<CertificateDetailsDto> getAllCertificatesForCurrentUser() {
+        User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        log.info("Fetching all certificates for user: {}", currentUser.getUsername());
+        List<CertificateData> certificates;
+
+        switch (currentUser.getRole()) {
+            case ADMIN:
+                certificates = certificateRepository.findAll();
+                break;
+            case CA_USER:
+                certificates = certificateRepository.findByOwner(currentUser);
+                break;
+            case ORDINARY_USER:
+                certificates = certificateRepository.findByOwnerAndIsCaFalse(currentUser);
+                break;
+            default:
+                certificates = List.of();
+                break;
+        }
+
+        return certificates.stream().map(cert -> new CertificateDetailsDto(
+                cert.getSerialNumber().toString(),
+                extractFieldFromDn(cert.getSubjectDN(), "CN"),
+                extractFieldFromDn(cert.getIssuerDN(), "CN"),
+                cert.getValidFrom(),
+                cert.getValidTo(),
+                cert.isCa(),
+                cert.isRevoked(),
+                cert.getOwner().getUsername(),
+                cert.getAlias()
+        )).collect(Collectors.toList());
     }
 
     public CertificateData createRootCertificate(CreateRootCertificateDto dto) {
         try {
-
-            // Dobijanje ključa ulogovanog korisnika ===
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            User currentUser = (User) authentication.getPrincipal(); // Pretpostavka da je Principal vaš User objekat
+            log.info("AUDIT: Starting creation of Root certificate for CN: {}", dto.getCommonName());
+            User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             String userSymmetricKey = currentUser.getUserSymmetricKey();
 
-            // Veoma važna provera!
             if (userSymmetricKey == null || userSymmetricKey.isEmpty()) {
                 throw new IllegalStateException("Currently logged in user does not have a symmetric key configured.");
             }
@@ -120,48 +157,28 @@ public class CertificateService {
             BigInteger serialNumber = new BigInteger(64, new SecureRandom());
 
             JcaX509v3CertificateBuilder certificateBuilder = new JcaX509v3CertificateBuilder(
-                    subjectAndIssuer,
-                    serialNumber,
-                    dto.getValidFrom(),
-                    dto.getValidTo(),
-                    subjectAndIssuer,
-                    publicKey
-            );
+                    subjectAndIssuer, serialNumber, dto.getValidFrom(), dto.getValidTo(), subjectAndIssuer, publicKey);
 
             certificateBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
             certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
 
-            ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
-                    .setProvider("BC")
-                    .build(privateKey);
-
-            X509Certificate certificate = new JcaX509CertificateConverter()
-                    .setProvider("BC")
-                    .getCertificate(certificateBuilder.build(contentSigner));
-
+            ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC").build(privateKey);
+            X509Certificate certificate = new JcaX509CertificateConverter().setProvider("BC").getCertificate(certificateBuilder.build(contentSigner));
             certificate.verify(publicKey);
-            System.out.println("Certificate created and verified successfully.");
+            log.info("Root certificate for CN: {} created and verified successfully.", dto.getCommonName());
 
-
-            // ---> KORAK 1: Generisanje nasumične, sigurne lozinke za ovaj sertifikat
             String randomPassword = generateRandomPassword(16);
-
-            // ---> KORAK 2: Enkripcija te lozinke pomoću master ključa
             String encryptedPassword = encryptionService.encrypt(randomPassword,userSymmetricKey);
-
-            // ---> KORAK 3: Čuvanje sertifikata i ključa u keystore sa ORIGINALNOM nasumičnom lozinkom
             String alias = generateAlias(dto.getCommonName(), serialNumber);
             keystoreService.saveCertificate(certificate, privateKey, alias, randomPassword);
-            System.out.println("Certificate and private key saved to keystore successfully under alias: " + alias);
+            log.info("Certificate and private key saved to keystore under alias: {}", alias);
 
-            User owner = currentUser; // Podrazumevano, vlasnik je onaj ko kreira
+            User owner = currentUser;
             if (currentUser.getRole().equals(UserRole.ADMIN) && dto.getOwnerId() != null) {
-                // Ako je admin i poslao je ownerId, pronađi tog korisnika i postavi ga kao vlasnika
-                // Ovde vam treba UserRepository da pronađete korisnika po ID-u
                 owner = userRepository.findById(dto.getOwnerId())
                         .orElseThrow(() -> new IllegalArgumentException("User with specified ownerId not found."));
             }
-            // ---> KORAK 4: Priprema i čuvanje meta-podataka u bazu, uključujući ENKRIPTOVANU lozinku
+
             CertificateData certData = new CertificateData();
             certData.setSerialNumber(serialNumber);
             certData.setSubjectDN(certificate.getSubjectX500Principal().getName());
@@ -169,26 +186,28 @@ public class CertificateService {
             certData.setValidFrom(dto.getValidFrom());
             certData.setValidTo(dto.getValidTo());
             certData.setCa(true);
-            certData.setAlias(alias); // Koristimo alias koji smo već jednom generisali
-            certData.setKeystorePassword(encryptedPassword); // Čuvamo enkriptovanu vrednost
+            certData.setAlias(alias);
+            certData.setKeystorePassword(encryptedPassword);
             certData.setOwner(owner);
 
-            return certificateRepository.save(certData);
+            CertificateData savedCert = certificateRepository.save(certData);
+            log.info("AUDIT: Successfully created Root certificate with serial number: {} and alias: {}", savedCert.getSerialNumber(), savedCert.getAlias());
+            return savedCert;
 
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("CRITICAL: Error while creating root certificate. Reason: {}", e.getMessage(), e);
             throw new RuntimeException("Error while creating root certificate.", e);
         }
     }
 
     public CertificateData createIntermediateCertificate(CreateIntermediateCertificateDto dto) {
         try {
+            log.info("AUDIT: Starting creation of Intermediate certificate for CN: {}", dto.getCommonName());
             User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-            // --- KORAK 1: Validacija i pribavljanje izdavaoca ---
 
-            // Pronalazimo podatke o izdavaocu u bazi
             Optional<CertificateData> issuerDataOptional = certificateRepository.findBySerialNumber(new BigInteger(dto.getIssuerSerialNumber()));
             if (issuerDataOptional.isEmpty()) {
+                log.warn("Failed to create intermediate cert. Reason: Issuer not found with serial number: {}", dto.getIssuerSerialNumber());
                 throw new IllegalArgumentException("Issuer certificate not found.");
             }
             CertificateData issuerData = issuerDataOptional.get();
@@ -197,17 +216,12 @@ public class CertificateService {
                 Template template = templateRepository.findById(dto.getTemplateId())
                         .orElseThrow(() -> new IllegalArgumentException("Template not found."));
 
-                // Validacija 1: Da li se issuer iz DTO-a poklapa sa onim iz šablona?
                 if (!template.getIssuer().getSerialNumber().equals(issuerData.getSerialNumber())) {
                     throw new IllegalArgumentException("Selected issuer does not match the issuer defined in the template.");
                 }
-
-                // Validacija 2: Da li CN (Common Name) zadovoljava regex iz šablona?
                 if (!dto.getCommonName().matches(template.getCommonNameRegex())) {
                     throw new IllegalArgumentException("Common Name does not match the template's validation rules.");
                 }
-
-                // Validacija 3: Da li je trajanje sertifikata u okviru TTL-a iz šablona?
                 long requestedDurationMillis = dto.getValidTo().getTime() - dto.getValidFrom().getTime();
                 long maxDurationMillis = TimeUnit.DAYS.toMillis(template.getTimeToLiveDays());
                 if (requestedDurationMillis > maxDurationMillis) {
@@ -215,118 +229,80 @@ public class CertificateService {
                 }
             }
 
-            assert currentUser != null;
             if (UserRole.CA_USER.equals(currentUser.getRole()) && !issuerData.getOwner().getId().equals(currentUser.getId())) {
+                log.warn("SECURITY: User {} tried to issue certificate with issuer {} which they do not own.", currentUser.getUsername(), issuerData.getSerialNumber());
                 throw new SecurityException("CA user can only use certificates they own.");
             }
-
-            // Provera da li je izdavalac CA sertifikat
             if (!issuerData.isCa()) {
+                log.warn("Failed to create intermediate cert. Reason: Issuer {} is not a CA.", issuerData.getSerialNumber());
                 throw new IllegalArgumentException("Issuer is not a CA certificate.");
             }
-
-            // Provera da li je povučen
             if (issuerData.isRevoked()) {
+                log.warn("Failed to create intermediate cert. Reason: Issuer {} has been revoked.", issuerData.getSerialNumber());
                 throw new IllegalArgumentException("Issuer certificate has been revoked.");
             }
 
-            // Učitavanje sertifikata izdavaoca da bismo proverili validnost
             X509Certificate issuerCertificate = keystoreService.readCertificate(issuerData.getAlias());
             if (issuerCertificate == null) {
+                log.error("CRITICAL: Could not load issuer certificate {} from keystore.", issuerData.getAlias());
                 throw new RuntimeException("Could not load issuer certificate from keystore.");
             }
 
-            // Provera perioda važenja izdavaoca
-            issuerCertificate.checkValidity(); // Ovo baca CertificateExpiredException ili CertificateNotYetValidException
+            issuerCertificate.checkValidity();
 
-            // Provera da li je period važenja novog sertifikata unutar perioda važenja izdavaoca
             if (dto.getValidFrom().before(issuerCertificate.getNotBefore()) || dto.getValidTo().after(issuerCertificate.getNotAfter())) {
+                log.warn("Failed to create intermediate cert. Reason: Validity period is outside issuer's validity.");
                 throw new IllegalArgumentException("Validity of the new certificate must be within the validity of the issuer certificate.");
             }
 
-            // --- KORAK 2: Učitavanje privatnog ključa izdavaoca ---
-            PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(
-                    issuerData.getAlias(),
-                    getDecryptedKeystorePassword(issuerData)
-            );
-
+            PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(issuerData.getAlias(), getDecryptedKeystorePassword(issuerData));
             if(issuerPrivateKey == null) {
+                log.error("CRITICAL: Could not load issuer's private key for alias {}. The password might be incorrect.", issuerData.getAlias());
                 throw new RuntimeException("Could not load issuer's private key. The password might be incorrect.");
             }
 
-            // --- KORAK 3: Generisanje novog para ključeva za intermediate sertifikat ---
             KeyPair keyPair = generateKeyPair();
             PrivateKey privateKey = keyPair.getPrivate();
             PublicKey publicKey = keyPair.getPublic();
 
-
-            // --- KORAK 4: Konstrukcija i potpisivanje sertifikata ---
             X500Name subject = new X500NameBuilder(BCStyle.INSTANCE)
-                    .addRDN(BCStyle.CN, dto.getCommonName())
-                    .addRDN(BCStyle.O, dto.getOrganization())
-                    .addRDN(BCStyle.OU, dto.getOrganizationalUnit())
-                    .addRDN(BCStyle.C, dto.getCountry())
-                    .addRDN(BCStyle.E, dto.getEmail())
-                    .build();
+                    .addRDN(BCStyle.CN, dto.getCommonName()).addRDN(BCStyle.O, dto.getOrganization())
+                    .addRDN(BCStyle.OU, dto.getOrganizationalUnit()).addRDN(BCStyle.C, dto.getCountry())
+                    .addRDN(BCStyle.E, dto.getEmail()).build();
 
             BigInteger serialNumber = new BigInteger(64, new SecureRandom());
-
             X500Name issuerName = X500Name.getInstance(issuerCertificate.getSubjectX500Principal().getEncoded());
 
             JcaX509v3CertificateBuilder certificateBuilder = new JcaX509v3CertificateBuilder(
-                    issuerName,
-                    serialNumber,
-                    dto.getValidFrom(),
-                    dto.getValidTo(),
-                    subject,
-                    publicKey
-            );
+                    issuerName, serialNumber, dto.getValidFrom(), dto.getValidTo(), subject, publicKey);
 
             certificateBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(true));
             certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
-
             certificateBuilder.addExtension(Extension.cRLDistributionPoints, false, createCrlDistributionPointsExtension(issuerData.getAlias()));
 
-            ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
-                    .setProvider("BC")
-                    .build(issuerPrivateKey); // Potpisuje se privatnim ključem izdavaoca!
-
-            X509Certificate certificate = new JcaX509CertificateConverter()
-                    .setProvider("BC")
-                    .getCertificate(certificateBuilder.build(contentSigner));
-
-            // Verifikacija (opciono, ali dobra praksa)
+            ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC").build(issuerPrivateKey);
+            X509Certificate certificate = new JcaX509CertificateConverter().setProvider("BC").getCertificate(certificateBuilder.build(contentSigner));
             certificate.verify(issuerCertificate.getPublicKey());
-            System.out.println("Intermediate certificate created and verified successfully.");
+            log.info("Intermediate certificate for CN: {} created and verified successfully.", dto.getCommonName());
 
-
-            // --- KORAK 5: Čuvanje novog sertifikata ---
-
-            // Generisanje i enkripcija lozinke
             String randomPassword = generateRandomPassword(16);
             String encryptedPassword = encryptionService.encrypt(randomPassword, getUserSymmetricKey());
 
-            // Čuvanje u keystore
             String alias = generateAlias(dto.getCommonName(), serialNumber);
-            // Važno: Moramo sačuvati ceo lanac sertifikata!
             X509Certificate[] chain = {certificate, issuerCertificate};
             keystoreService.saveCertificateChain(chain, privateKey, alias, randomPassword);
+            log.info("Certificate chain saved to keystore under alias: {}", alias);
 
-            // Postavljanje vlasnika
-            User owner = currentUser; // Podrazumevano, vlasnik je onaj ko kreira
+            User owner = currentUser;
             if (currentUser.getRole().equals(UserRole.ADMIN) && dto.getOwnerId() != null) {
-                // Ako je admin i poslao je ownerId, pronađi tog korisnika i postavi ga kao vlasnika
-                // Ovde vam treba UserRepository da pronađete korisnika po ID-u
                 owner = userRepository.findById(dto.getOwnerId())
                         .orElseThrow(() -> new IllegalArgumentException("User with specified ownerId not found."));
             }
 
-
-            // Priprema i čuvanje meta-podataka u bazu
             CertificateData certData = new CertificateData();
             certData.setSerialNumber(serialNumber);
             certData.setSubjectDN(certificate.getSubjectX500Principal().getName());
-            certData.setIssuerDN(certificate.getIssuerX500Principal().getName()); // Ovo će biti DN izdavaoca
+            certData.setIssuerDN(certificate.getIssuerX500Principal().getName());
             certData.setValidFrom(dto.getValidFrom());
             certData.setValidTo(dto.getValidTo());
             certData.setCa(true);
@@ -334,30 +310,33 @@ public class CertificateService {
             certData.setKeystorePassword(encryptedPassword);
             certData.setOwner(owner);
 
-            return certificateRepository.save(certData);
+            CertificateData savedCert = certificateRepository.save(certData);
+            log.info("AUDIT: Successfully created Intermediate certificate with serial number: {} and alias: {}", savedCert.getSerialNumber(), savedCert.getAlias());
+            return savedCert;
 
         } catch (CertificateExpiredException | CertificateNotYetValidException e) {
+            log.warn("Failed to create intermediate cert. Reason: Issuer certificate is not valid at this time.");
             throw new IllegalArgumentException("Issuer certificate is not valid at this time.", e);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("CRITICAL: Error while creating intermediate certificate. Reason: {}", e.getMessage(), e);
             throw new RuntimeException("Error while creating intermediate certificate.", e);
         }
     }
 
-    public CertificateData createEndEntityCertificate(CreateEeCertificateDto dto, MultipartFile csrFile) {
+    public CertificateData createEndEntityCertificate(CreateEeCertificateDto dto, String csrPem, User finalOwner) {
         try {
-            User currentUser = (User) Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()).getPrincipal();
+            log.info("AUDIT: Starting creation of End-Entity certificate for user: {}", finalOwner.getUsername());
+            User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
-            // --- KORAK 1: Validacija i pribavljanje izdavaoca (isto kao za Intermediate) ---
             Optional<CertificateData> issuerDataOptional = certificateRepository.findBySerialNumber(new BigInteger(dto.getIssuerSerialNumber()));
             if (issuerDataOptional.isEmpty()) {
+                log.warn("Failed to create EE cert. Reason: Issuer not found with serial number: {}", dto.getIssuerSerialNumber());
                 throw new IllegalArgumentException("Issuer certificate not found.");
             }
             CertificateData issuerData = issuerDataOptional.get();
 
-
-
             if (UserRole.CA_USER.equals(currentUser.getRole()) && !issuerData.getOwner().getId().equals(currentUser.getId())) {
+                log.warn("SECURITY: User {} tried to issue EE certificate with issuer {} which they do not own.", currentUser.getUsername(), issuerData.getSerialNumber());
                 throw new SecurityException("CA user can only use certificates they own.");
             }
             if (!issuerData.isCa()) throw new IllegalArgumentException("Issuer is not a CA certificate.");
@@ -368,13 +347,15 @@ public class CertificateService {
 
             issuerCertificate.checkValidity();
 
-            Date validFrom = new Date(); // EE sertifikat važi od trenutka izdavanja
+            Date validFrom = new Date();
             if (validFrom.before(issuerCertificate.getNotBefore()) || dto.getValidTo().after(issuerCertificate.getNotAfter())) {
                 throw new IllegalArgumentException("Validity of the new certificate must be within the validity of the issuer certificate.");
             }
 
-            PKCS10CertificationRequest csr = parseCsr(csrFile);
+            PKCS10CertificationRequest csr = parseCsr(csrPem);
+
             if (!isCsrSignatureValid(csr)) {
+                log.warn("Failed to create EE cert. Reason: CSR signature is not valid.");
                 throw new IllegalArgumentException("CSR signature is not valid.");
             }
             X500Name subject = csr.getSubject();
@@ -385,19 +366,16 @@ public class CertificateService {
                 template = templateRepository.findById(dto.getTemplateId())
                         .orElseThrow(() -> new IllegalArgumentException("Template not found."));
 
-                // Validacija 1: Da li se issuer iz DTO-a poklapa sa onim iz šablona?
                 if (!template.getIssuer().getSerialNumber().equals(issuerData.getSerialNumber())) {
                     throw new IllegalArgumentException("Selected issuer does not match the issuer defined in the template.");
                 }
 
-                // Validacija 2: Da li trajanje sertifikata poštuje TTL iz šablona?
                 long requestedDurationMillis = dto.getValidTo().getTime() - validFrom.getTime();
                 long maxDurationMillis = TimeUnit.DAYS.toMillis(template.getTimeToLiveDays());
                 if (requestedDurationMillis > maxDurationMillis) {
                     throw new IllegalArgumentException("Certificate duration exceeds the template's maximum Time-To-Live.");
                 }
 
-                // Validacija 3: Da li CN (Common Name) iz CSR-a zadovoljava regex iz šablona?
                 String commonNameFromCsr = extractCommonNameFromX500(subject);
                 if (commonNameFromCsr == null || !commonNameFromCsr.matches(template.getCommonNameRegex())) {
                     throw new IllegalArgumentException("Common Name from CSR does not match the template's validation rules.");
@@ -408,7 +386,6 @@ public class CertificateService {
                     if (attributes.length > 0) {
                         Extensions extensions = Extensions.getInstance(attributes[0].getAttrValues().getObjectAt(0));
                         GeneralNames san = GeneralNames.fromExtensions(extensions, Extension.subjectAlternativeName);
-
                         if (san != null) {
                             for (GeneralName name : san.getNames()) {
                                 if (name.getTagNo() == GeneralName.dNSName) {
@@ -417,90 +394,69 @@ public class CertificateService {
                                         throw new IllegalArgumentException("A Subject Alternative Name (" + dnsName + ") from CSR does not match the template's validation rules.");
                                     }
                                 }
-                                // Ovde se mogu dodati i provere za druge tipove imena ako je potrebno (IP adrese, email, itd.)
                             }
                         }
                     }
                 }
             }
 
-            // --- KORAK 2: Učitavanje privatnog ključa izdavaoca (isto kao za Intermediate) ---
-            PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(
-                    issuerData.getAlias(),
-                    getDecryptedKeystorePassword(issuerData)
-            );
+            PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(issuerData.getAlias(), getDecryptedKeystorePassword(issuerData));
             if (issuerPrivateKey == null) throw new RuntimeException("Could not load issuer's private key.");
 
-            // --- KORAK 4: Konstrukcija i potpisivanje sertifikata ---
             BigInteger serialNumber = new BigInteger(64, new SecureRandom());
             X500Name issuerName = X500Name.getInstance(issuerCertificate.getSubjectX500Principal().getEncoded());
 
             JcaX509v3CertificateBuilder certificateBuilder = new JcaX509v3CertificateBuilder(
-                    issuerName,
-                    serialNumber,
-                    validFrom,
-                    dto.getValidTo(),
-                    subject,
-                    subjectPublicKey // Javni ključ iz CSR-a!
-            );
+                    issuerName, serialNumber, validFrom, dto.getValidTo(), subject, subjectPublicKey);
 
-            // Ključna razlika: BasicConstraints je false za EE sertifikate
             certificateBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
             certificateBuilder.addExtension(Extension.cRLDistributionPoints, false, createCrlDistributionPointsExtension(issuerData.getAlias()));
 
             if (template != null) {
-                // Ako koristimo šablon, primeni vrednosti iz njega
-                // 1. Key Usage
                 if (template.getKeyUsage() != null && !template.getKeyUsage().isEmpty()) {
                     certificateBuilder.addExtension(Extension.keyUsage, true, buildKeyUsageFromTemplate(template.getKeyUsage()));
                 }
-                // 2. Extended Key Usage
                 if (template.getExtendedKeyUsage() != null && !template.getExtendedKeyUsage().isEmpty()) {
                     certificateBuilder.addExtension(Extension.extendedKeyUsage, false, buildExtendedKeyUsageFromTemplate(template.getExtendedKeyUsage()));
                 }
             } else {
-                // Fallback logika ako se ne koristi šablon
                 certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
             }
 
-            ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
-                    .setProvider("BC")
-                    .build(issuerPrivateKey); // Potpisuje se privatnim ključem izdavaoca!
-
-            X509Certificate certificate = new JcaX509CertificateConverter()
-                    .setProvider("BC")
-                    .getCertificate(certificateBuilder.build(contentSigner));
-
+            ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC").build(issuerPrivateKey);
+            X509Certificate certificate = new JcaX509CertificateConverter().setProvider("BC").getCertificate(certificateBuilder.build(contentSigner));
             certificate.verify(issuerCertificate.getPublicKey());
-            System.out.println("End-Entity certificate created and verified successfully.");
+            log.info("End-Entity certificate for subject '{}' created and verified successfully.", subject.toString());
 
-            // --- KORAK 5: Čuvanje novog sertifikata (bez privatnog ključa) ---
-            String alias = generateAlias(subject.toString(), serialNumber);
+            String commonNameFromCsr = extractFieldFromDn(subject.toString(), "CN");
+            String alias = generateAlias(commonNameFromCsr, serialNumber);
 
-            // Koristimo novu metodu koja ne čuva privatni ključ
             keystoreService.saveTrustedCertificate(certificate, alias);
+            log.info("Trusted EE certificate saved to keystore under alias: {}", alias);
 
-            // Priprema i čuvanje meta-podataka u bazu
             CertificateData certData = new CertificateData();
             certData.setSerialNumber(serialNumber);
             certData.setSubjectDN(certificate.getSubjectX500Principal().getName());
             certData.setIssuerDN(certificate.getIssuerX500Principal().getName());
             certData.setValidFrom(validFrom);
             certData.setValidTo(dto.getValidTo());
-            certData.setCa(false); // Ovo je EE sertifikat
+            certData.setCa(false);
             certData.setAlias(alias);
-            certData.setKeystorePassword(null); // Nema lozinke jer nema privatnog ključa
-            certData.setOwner(currentUser); // Vlasnik je korisnik koji je podneo zahtev
+            certData.setKeystorePassword(null);
+            certData.setOwner(finalOwner);
 
-            return certificateRepository.save(certData);
+            CertificateData savedCert = certificateRepository.save(certData);
+            log.info("AUDIT: Successfully created End-Entity certificate with serial number: {} for owner: {}", savedCert.getSerialNumber(), finalOwner.getUsername());
+            return savedCert;
 
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Error while creating end-entity certificate.", e);
+            log.error("CRITICAL: Error while creating end-entity certificate. Reason: {}", e.getMessage(), e);
+            throw new RuntimeException("Error while creating end-entity certificate: " + e.getMessage(), e);
         }
     }
 
     public void revokeCertificate(BigInteger serialNumber, RevocationReason reason) {
+        log.info("AUDIT: Attempting to revoke certificate with serial number: {} for reason: {}", serialNumber, reason);
         CertificateData certToRevoke = certificateRepository.findBySerialNumber(serialNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Certificate with serial number " + serialNumber + " not found."));
 
@@ -512,35 +468,50 @@ public class CertificateService {
         boolean isAdmin = currentUser.getRole().equals(UserRole.ADMIN);
 
         if (!isAdmin && !certToRevoke.getOwner().getId().equals(currentUser.getId())) {
+            log.warn("SECURITY: User {} attempted to revoke certificate {} which they do not own.", currentUser.getUsername(), serialNumber);
             throw new SecurityException("You do not have permission to revoke this certificate.");
         }
 
         revokeChain(certToRevoke, reason);
+        log.info("AUDIT: Successfully revoked certificate with serial number: {}", serialNumber);
+    }
+
+    private void revokeChain(CertificateData certData, RevocationReason reason) {
+        if (certData.isRevoked()) {
+            return;
+        }
+
+        certData.setRevoked(true);
+        certData.setRevocationReason(reason);
+        certData.setRevocationDate(new Date());
+        certificateRepository.save(certData);
+
+        log.info("Revoked certificate with SN: {}", certData.getSerialNumber());
+
+        if (certData.isCa()) {
+            log.info("Certificate {} is a CA. Revoking its issued certificates.", certData.getSerialNumber());
+            List<CertificateData> issuedCertificates = certificateRepository.findByIssuerDN(certData.getSubjectDN());
+
+            for (CertificateData issuedCert : issuedCertificates) {
+                revokeChain(issuedCert, RevocationReason.CA_COMPROMISE);
+            }
+        }
     }
 
     public byte[] generateCrl(String issuerAlias) throws Exception {
-        System.out.println("--- Generating CRL for alias: " + issuerAlias + " ---");
-
+        log.info("Generating CRL for issuer alias: {}", issuerAlias);
         CertificateData issuerData = certificateRepository.findAll().stream()
                 .filter(cert -> issuerAlias.equals(cert.getAlias()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Issuer with alias '" + issuerAlias + "' not found."));
 
-        System.out.println("-> Found issuer in DB. Alias: " + issuerData.getAlias() + ", isCa: " + issuerData.isCa() + ", isRevoked: " + issuerData.isRevoked());
-
         if (!issuerData.isCa())
             throw new IllegalArgumentException("The specified alias does not belong to a CA certificate.");
-
         if (issuerData.isRevoked())
             throw new IllegalArgumentException("Cannot generate CRL from a revoked issuer.");
 
-
         X509Certificate issuerCert = keystoreService.readCertificate(issuerAlias);
-        PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(
-                issuerAlias,
-                getDecryptedKeystorePassword(issuerData, issuerData.getOwner())
-        );
-
+        PrivateKey issuerPrivateKey = keystoreService.readPrivateKey(issuerAlias, getDecryptedKeystorePassword(issuerData, issuerData.getOwner()));
         if (issuerCert == null || issuerPrivateKey == null) {
             throw new RuntimeException("Could not load issuer's certificate or private key from keystore.");
         }
@@ -556,6 +527,7 @@ public class CertificateService {
         crlBuilder.setNextUpdate(nextUpdate);
 
         List<CertificateData> revokedCerts = certificateRepository.findByIssuerDNAndIsRevokedTrue(issuerData.getSubjectDN());
+        log.info("Found {} revoked certificates issued by {}", revokedCerts.size(), issuerAlias);
 
         for (CertificateData revokedCert : revokedCerts) {
             crlBuilder.addCRLEntry(
@@ -565,15 +537,10 @@ public class CertificateService {
             );
         }
 
-        JcaContentSignerBuilder contentSignerBuilder = new JcaContentSignerBuilder("SHA256WithRSAEncryption")
-                .setProvider("BC");
+        JcaContentSignerBuilder contentSignerBuilder = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC");
         ContentSigner contentSigner = contentSignerBuilder.build(issuerPrivateKey);
-
         X509CRLHolder crlHolder = crlBuilder.build(contentSigner);
-
-        X509CRL crl = new JcaX509CRLConverter().setProvider("BC").getCRL(crlHolder);
-
-        return crl.getEncoded();
+        return new JcaX509CRLConverter().setProvider("BC").getCRL(crlHolder).getEncoded();
     }
 
     private KeyUsage buildKeyUsageFromTemplate(String keyUsageString) {
@@ -601,34 +568,20 @@ public class CertificateService {
 
         for (String value : purposeValues) {
             String trimmedValue = value.trim();
-            if (trimmedValue.isEmpty()) {
-                continue;
-            }
+            if (trimmedValue.isEmpty()) continue;
 
             switch (trimmedValue.toLowerCase()) {
-                case "serverauth":
-                    purposes.add(KeyPurposeId.id_kp_serverAuth);
-                    break;
-                case "clientauth":
-                    purposes.add(KeyPurposeId.id_kp_clientAuth);
-                    break;
-                case "codesigning":
-                    purposes.add(KeyPurposeId.id_kp_codeSigning);
-                    break;
-                case "emailprotection":
-                    purposes.add(KeyPurposeId.id_kp_emailProtection);
-                    break;
-                case "timestamping":
-                    purposes.add(KeyPurposeId.id_kp_timeStamping);
-                    break;
-                case "ocspsigning":
-                    purposes.add(KeyPurposeId.id_kp_OCSPSigning);
-                    break;
+                case "serverauth": purposes.add(KeyPurposeId.id_kp_serverAuth); break;
+                case "clientauth": purposes.add(KeyPurposeId.id_kp_clientAuth); break;
+                case "codesigning": purposes.add(KeyPurposeId.id_kp_codeSigning); break;
+                case "emailprotection": purposes.add(KeyPurposeId.id_kp_emailProtection); break;
+                case "timestamping": purposes.add(KeyPurposeId.id_kp_timeStamping); break;
+                case "ocspsigning": purposes.add(KeyPurposeId.id_kp_OCSPSigning); break;
                 default:
                     try {
                         purposes.add(KeyPurposeId.getInstance(new ASN1ObjectIdentifier(trimmedValue)));
                     } catch (IllegalArgumentException e) {
-                        System.err.println("Warning: Skipping invalid or unsupported Extended Key Usage value: '" + trimmedValue + "'");
+                        log.warn("Skipping invalid or unsupported Extended Key Usage value: '{}'", trimmedValue);
                     }
                     break;
             }
@@ -637,7 +590,6 @@ public class CertificateService {
         if (purposes.isEmpty()) {
             throw new IllegalArgumentException("ExtendedKeyUsage string resulted in no valid purposes.");
         }
-
         return new ExtendedKeyUsage(purposes.toArray(new KeyPurposeId[0]));
     }
 
@@ -646,45 +598,22 @@ public class CertificateService {
         return (cnRdn != null) ? IETFUtils.valueToString(cnRdn.getFirst().getValue()) : null;
     }
 
-    private void revokeChain(CertificateData certData, RevocationReason reason) {
-        if (certData.isRevoked()) {
-            return;
-        }
-
-        certData.setRevoked(true);
-        certData.setRevocationReason(reason);
-        certData.setRevocationDate(new Date());
-        certificateRepository.save(certData);
-
-        System.out.println("Revoked certificate with SN: " + certData.getSerialNumber());
-
-        if (certData.isCa()) {
-            List<CertificateData> issuedCertificates = certificateRepository.findByIssuerDN(certData.getSubjectDN());
-
-            for (CertificateData issuedCert : issuedCertificates) {
-                revokeChain(issuedCert, RevocationReason.CA_COMPROMISE);
-            }
-        }
-    }
-
-    private PKCS10CertificationRequest parseCsr(MultipartFile csrFile) throws Exception {
-        try (PemReader pemReader = new PemReader(new InputStreamReader(csrFile.getInputStream()))) {
+    private PKCS10CertificationRequest parseCsr(String csrPem) throws IOException, PKCSException {
+        try (PemReader pemReader = new PemReader(new StringReader(csrPem))) {
             PemObject pemObject = pemReader.readPemObject();
             if (pemObject == null) {
-                throw new IllegalArgumentException("Invalid CSR file: Not a PEM-encoded file.");
+                throw new IllegalArgumentException("Invalid CSR PEM string: Not a PEM-encoded content.");
             }
             return new PKCS10CertificationRequest(pemObject.getContent());
         }
     }
 
-    private boolean isCsrSignatureValid(PKCS10CertificationRequest csr) throws Exception {
+    private boolean isCsrSignatureValid(PKCS10CertificationRequest csr) throws OperatorCreationException, PKCSException, NoSuchAlgorithmException, InvalidKeyException, NoSuchProviderException {
         JcaPKCS10CertificationRequest jcaCsr = new JcaPKCS10CertificationRequest(csr);
-        ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder()
-                .setProvider("BC").build(jcaCsr.getPublicKey());
+        ContentVerifierProvider verifierProvider = new JcaContentVerifierProviderBuilder().setProvider("BC").build(jcaCsr.getPublicKey());
         return csr.isSignatureValid(verifierProvider);
     }
 
-    // Pomoćna metoda za dobijanje dekriptovane lozinke
     private String getDecryptedKeystorePassword(CertificateData certData) throws Exception {
         String userSymmetricKey = getUserSymmetricKey();
         return encryptionService.decrypt(certData.getKeystorePassword(), userSymmetricKey);
@@ -698,7 +627,6 @@ public class CertificateService {
         return encryptionService.decrypt(certData.getKeystorePassword(), userSymmetricKey);
     }
 
-    // Pomoćna metoda za dobijanje ključa ulogovanog korisnika
     private String getUserSymmetricKey() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         User currentUser = (User) authentication.getPrincipal();
@@ -729,14 +657,12 @@ public class CertificateService {
         return commonName.replace(" ", "_").toLowerCase() + "_" + serialNumber.toString(16);
     }
 
-    private CRLDistPoint createCrlDistributionPointsExtension(String issuerAlias) {
+    private CRLDistPoint createCrlDistributionPointsExtension(String issuerAlias) throws IOException {
         String crlUrl = "http://localhost:8080/api/certificates/crl/" + issuerAlias;
-
         GeneralName generalName = new GeneralName(GeneralName.uniformResourceIdentifier, crlUrl);
         GeneralNames generalNames = new GeneralNames(generalName);
         DistributionPointName distributionPointName = new DistributionPointName(generalNames);
         DistributionPoint distributionPoint = new DistributionPoint(distributionPointName, null, null);
-
         return new CRLDistPoint(new DistributionPoint[]{distributionPoint});
     }
 }

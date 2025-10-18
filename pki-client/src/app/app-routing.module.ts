@@ -8,6 +8,10 @@ import { ResetPasswordComponent } from './auth/reset-password/reset-password.com
 import { ForcePasswordChangeComponent } from './auth/force-password-change/force-password-change.component';
 import { CreateCaUserComponent } from './admin/create-ca-user/create-ca-user.component';
 import { ActiveSessionComponent } from './session-management/active-session/active-session.component';
+import { RootCertificateComponent } from './certificate-management/root-certificate/root-certificate.component'; 
+import { IntermediateCertificateComponent } from './certificate-management/intermediate-certificate/intermediate-certificate.component';
+import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
+
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'register', component: RegisterComponent },
@@ -35,6 +39,26 @@ const routes: Routes = [
     component: CreateCaUserComponent,
     canActivate: [AuthGuard],
     data: { expectedRoles: ['ADMIN'] }
+  },
+   {
+    path: 'create-root-certificate',
+    component: RootCertificateComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ADMIN'] } 
+  },
+
+  
+  {
+    path: 'create-intermediate-certificate',
+    component: IntermediateCertificateComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ADMIN', 'CA_USER'] } 
+  },
+  {
+    path: 'certificate-request',
+    component: EeCertificateComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ORDINARY_USER'] } // Samo za obične korisnike
   },
       
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },

@@ -1,17 +1,17 @@
 package rs.ac.uns.ftn.bsep.pki_service.controller;
 
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import rs.ac.uns.ftn.bsep.pki_service.dto.CaUserDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CaUserPasswordChangeRequestDto;
 import rs.ac.uns.ftn.bsep.pki_service.service.UserService;
 
 import java.security.Principal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/user")
@@ -31,5 +31,12 @@ public class UserController {
 
         userService.caUserChangePassword(principal.getName(), dto);
         return ResponseEntity.ok("Password changed successfully.");
+    }
+
+    @GetMapping("/ca-users")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<CaUserDto>> getCaUsers() {
+        List<CaUserDto> caUsers = userService.getAllCaUsers();
+        return ResponseEntity.ok(caUsers);
     }
 }
