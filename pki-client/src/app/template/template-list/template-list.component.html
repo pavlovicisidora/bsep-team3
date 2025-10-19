@@ -1,0 +1,31 @@
+<app-navbar></app-navbar>
+<div class="container">
+  <h2>Certificate Templates</h2>
+  <p>Manage templates for issuing new certificates.</p>
+
+  <button class="btn-create" routerLink="/templates/new">
+    + Create New Template
+  </button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Template Name</th>
+        <th>Issuer CN</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let template of templates">
+        <td>{{ template.name }}</td>
+        <td>{{ extractCn(template.issuer.subjectDN) }}</td>
+        <td>
+          <button class="btn-delete" (click)="deleteTemplate(template.id)">Delete</button>
+        </td>
+      </tr>
+      <tr *ngIf="templates.length === 0">
+        <td colspan="3">No templates found.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
