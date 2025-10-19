@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { Template } from '../template/template.model';
 
 
 export interface CreateRootCertificateDto {
@@ -24,6 +25,7 @@ export interface CreateIntermediateCertificateDto {
   validFrom: string;
   validTo: string;
   ownerId: number;
+  templateId?: number | null;
 }
 
 export interface Issuer {
@@ -105,8 +107,13 @@ export class CertificateManagementService {
   private readonly certApiUrl = 'http://localhost:8080/api/certificates';
   private readonly userApiUrl = 'http://localhost:8080/api/user';
   private readonly requestApiUrl = 'http://localhost:8080/api/certificate-requests';
+  private readonly templateApiUrl = 'http://localhost:8080/api/templates';
 
   constructor(private http: HttpClient) { }
+  
+  getTemplates(): Observable<Template[]> {
+    return this.http.get<Template[]>(this.templateApiUrl);
+  }
 
   // --- METODE ZA SERTIFIKATE ---
 
@@ -125,13 +132,14 @@ export class CertificateManagementService {
     return this.http.post<CertificateData>(endpoint, certificateDto);
   }
 
-  createCertificateRequest(issuerSerialNumber: string, validTo: string, csrFile: File): Observable<any> {
+  createCertificateRequest(issuerSerialNumber: string, validTo: string, csrFile: File, templateId?: number | null): Observable<any> {
     const formData = new FormData();
 
     // 1. Kreiramo DTO objekat koji backend očekuje.
     const dto = {
       issuerSerialNumber: issuerSerialNumber,
-      validTo: validTo
+      validTo: validTo,
+      templateId: templateId 
     };
 
     // 2. Pretvaramo DTO objekat u JSON string i umotavamo ga u Blob.

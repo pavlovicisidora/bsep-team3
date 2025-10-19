@@ -13,18 +13,27 @@ export class TemplateFormComponent implements OnInit {
   templateForm: FormGroup;
   issuers: Issuer[] = [];
   keyUsageOptions = [
-    { name: 'Digital Signature', value: 'digitalSignature' },
-    { name: 'Key Encipherment', value: 'keyEncipherment' },
-    { name: 'Data Encipherment', value: 'dataEncipherment' },
-    { name: 'Key Agreement', value: 'keyAgreement' },
-    { name: 'Certificate Sign', value: 'keyCertSign' },
-    { name: 'CRL Sign', value: 'cRLSign' },
+    // Najčešće korišćene
+    { name: 'Digital Signature', value: 'digitalsignature' },
+    { name: 'Key Encipherment', value: 'keyencipherment' },
+    { name: 'Data Encipherment', value: 'dataencipherment' },
+    { name: 'Non Repudiation', value: 'nonrepudiation' },
+    // Specifične za CA
+    { name: 'Certificate Sign', value: 'keycertsign' },
+    { name: 'CRL Sign', value: 'crlsign' },
+    // Manje česte
+    { name: 'Key Agreement', value: 'keyagreement' },
+    { name: 'Encipher Only', value: 'encipheronly' },
+    { name: 'Decipher Only', value: 'decipheronly' },
   ];
+
   extendedKeyUsageOptions = [
-    { name: 'Server Authentication', value: 'serverAuth' },
-    { name: 'Client Authentication', value: 'clientAuth' },
-    { name: 'Code Signing', value: 'codeSigning' },
-    { name: 'Email Protection', value: 'emailProtection' },
+    { name: 'Server Authentication', value: 'serverauth' },
+    { name: 'Client Authentication', value: 'clientauth' },
+    { name: 'Code Signing', value: 'codesigning' },
+    { name: 'Email Protection', value: 'emailprotection' },
+    { name: 'Time Stamping', value: 'timestamping' },
+    { name: 'OCSP Signing', value: 'ocspsigning' },
   ];
 
   constructor(

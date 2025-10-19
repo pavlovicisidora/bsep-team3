@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import rs.ac.uns.ftn.bsep.pki_service.dto.CreateIntermediateCertificateDto;
 import rs.ac.uns.ftn.bsep.pki_service.dto.TemplateCreateDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.TemplateResponseDto;
 import rs.ac.uns.ftn.bsep.pki_service.model.CertificateData;
 import rs.ac.uns.ftn.bsep.pki_service.model.Template;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
@@ -30,6 +31,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -89,14 +91,18 @@ public class TemplateService {
         return savedTemplate;
     }
 
-    public List<Template> getTemplatesForCurrentUser() {
+    public List<TemplateResponseDto> getTemplatesForCurrentUser() {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         assert currentUser != null;
         log.info("Fetching templates for user '{}'.", currentUser.getUsername());
         if (!currentUser.getRole().equals(UserRole.CA_USER)) {
             return List.of();
         }
-        return templateRepository.findByOwner(currentUser);
+        List<Template> templates = templateRepository.findByOwner(currentUser);
+
+        return templates.stream()
+                .map(TemplateResponseDto::new)
+                .collect(Collectors.toList());
     }
 
     public void deleteTemplate(Long id) {

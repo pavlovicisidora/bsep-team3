@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import rs.ac.uns.ftn.bsep.pki_service.dto.TemplateCreateDto;
+import rs.ac.uns.ftn.bsep.pki_service.dto.TemplateResponseDto;
 import rs.ac.uns.ftn.bsep.pki_service.model.Template;
 import rs.ac.uns.ftn.bsep.pki_service.service.TemplateService;
 
@@ -27,7 +28,7 @@ public class TemplateController {
 
     @GetMapping
     @PreAuthorize("hasRole('CA_USER')")
-    public ResponseEntity<List<Template>> getUserTemplates() {
+    public ResponseEntity<List<TemplateResponseDto>> getUserTemplates() {
         return ResponseEntity.ok(templateService.getTemplatesForCurrentUser());
     }
 

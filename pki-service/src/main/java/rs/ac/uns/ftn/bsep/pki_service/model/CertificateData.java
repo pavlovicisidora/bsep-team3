@@ -64,5 +64,8 @@ public class CertificateData {
     @JoinColumn(name = "owner_id", nullable = false) // Definiše ime kolone u bazi
     private User owner;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "template_id", nullable = true)
+    private Template template;
 
 }
