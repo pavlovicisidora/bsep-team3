@@ -11,6 +11,8 @@ import { ActiveSessionComponent } from './session-management/active-session/acti
 import { RootCertificateComponent } from './certificate-management/root-certificate/root-certificate.component'; 
 import { IntermediateCertificateComponent } from './certificate-management/intermediate-certificate/intermediate-certificate.component';
 import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
+import { TemplateFormComponent } from './template/template-form/template-form.component';
+import { TemplateListComponent } from './template/template-list/template-list.component';
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -59,6 +61,18 @@ const routes: Routes = [
     component: EeCertificateComponent,
     canActivate: [AuthGuard],
     data: { expectedRoles: ['ORDINARY_USER'] } // Samo za obične korisnike
+  },
+  {
+    path: 'templates',
+    component: TemplateListComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['CA_USER'] } 
+  },
+  {
+    path: 'templates/new',
+    component: TemplateFormComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['CA_USER'] } 
   },
       
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
