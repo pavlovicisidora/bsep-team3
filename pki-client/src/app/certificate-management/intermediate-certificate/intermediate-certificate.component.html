@@ -14,6 +14,16 @@
   <ng-template #formContent>
     <form [formGroup]="intermediateCertForm" (ngSubmit)="onSubmit()">
 
+      <div class="form-group mb-3">
+        <label for="templateId" class="form-label">Koristi Šablon (Opciono)</label>
+        <select id="templateId" class="form-control" formControlName="templateId">
+          <option [ngValue]="null">-- Bez Šablona --</option>
+          <option *ngFor="let template of templates" [value]="template.id">
+            {{ template.name }}
+          </option>
+        </select>
+      </div>
+
       <!-- Dropdown za izbor Izdavaoca (Issuer) -->
       <div class="form-group mb-3">
         <label for="issuerSerialNumber" class="form-label">Izdavalac (Potpisnik)</label>
@@ -32,9 +42,14 @@
       <div class="form-group mb-3">
         <label for="commonName" class="form-label">Common Name (CN)</label>
         <input type="text" id="commonName" class="form-control" formControlName="commonName" placeholder="Npr. Moja Kompanija Intermediate CA">
-        <div *ngIf="isControlInvalid('commonName')" class="text-danger mt-1">Common Name je obavezno polje.</div>
+        <!-- Prikazujemo i grešku za regex ako je šablon izabran -->
+        <div *ngIf="isControlInvalid('commonName')" class="text-danger mt-1">
+          <div *ngIf="intermediateCertForm.get('commonName')?.errors?.['required']">Common Name je obavezno polje.</div>
+          <div *ngIf="intermediateCertForm.get('commonName')?.errors?.['pattern']">Format ne odgovara pravilima šablona.</div>
+        </div>
       </div>
-
+      
+      <!-- Polje za Organizaciju - biće zaključano ako je šablon izabran -->
       <div class="form-group mb-3">
         <label for="organization" class="form-label">Organizacija (O)</label>
         <input type="text" id="organization" class="form-control" formControlName="organization" placeholder="Npr. Moja Kompanija">
@@ -96,6 +111,37 @@
         </select>
         <div *ngIf="isControlInvalid('ownerId')" class="text-danger mt-1">
           Morate izabrati korisnika kome se dodeljuje sertifikat.
+        </div>
+      </div>
+
+      <div *ngIf="isTemplateSelected">
+        <hr>
+        <p class="form-section-title">Ekstenzije definisane šablonom</p>
+        
+        <!-- Key Usage -->
+        <div class="form-group mb-3" formArrayName="keyUsage">
+          <label class="form-label">Key Usage</label>
+          <div class="checkbox-group-readonly">
+            <div *ngFor="let option of keyUsageOptions; let i = index" 
+                class="checkbox-item" [class.selected]="keyUsageControls[i].value">
+              <input type="checkbox" [formControlName]="i" style="display: none;"> 
+              <mat-icon>{{ keyUsageControls[i].value ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+              <span>{{ option.name }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Extended Key Usage -->
+        <div class="form-group mb-3" formArrayName="extendedKeyUsage">
+          <label class="form-label">Extended Key Usage</label>
+          <div class="checkbox-group-readonly">
+            <div *ngFor="let option of extendedKeyUsageOptions; let i = index"
+                class="checkbox-item" [class.selected]="extendedKeyUsageControls[i].value">
+              <input type="checkbox" [formControlName]="i" style="display: none;"> 
+              <mat-icon>{{ extendedKeyUsageControls[i].value ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+              <span>{{ option.name }}</span>
+            </div>
+          </div>
         </div>
       </div>
 

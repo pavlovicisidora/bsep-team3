@@ -298,6 +298,9 @@ public class CertificateService {
             certData.setAlias(alias);
             certData.setKeystorePassword(encryptedPassword);
             certData.setOwner(owner);
+            if (dto.getTemplateId() != null) {
+                templateRepository.findById(dto.getTemplateId()).ifPresent(certData::setTemplate);
+            }
 
             CertificateData savedCert = certificateRepository.save(certData);
             log.info("AUDIT: Successfully created Intermediate certificate with serial number: {} and alias: {}", savedCert.getSerialNumber(), savedCert.getAlias());
@@ -396,6 +399,9 @@ public class CertificateService {
             certData.setAlias(alias);
             certData.setKeystorePassword("");
             certData.setOwner(finalOwner);
+            if (dto.getTemplateId() != null) {
+                templateRepository.findById(dto.getTemplateId()).ifPresent(certData::setTemplate);
+            }
 
             CertificateData savedCert = certificateRepository.save(certData);
             log.info("AUDIT: Successfully created End-Entity certificate with serial number: {} for owner: {}", savedCert.getSerialNumber(), finalOwner.getUsername());
