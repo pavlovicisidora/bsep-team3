@@ -71,7 +71,7 @@ const routes: Routes = [
     path: 'certificate-request',
     component: EeCertificateComponent,
     canActivate: [AuthGuard],
-    data: { expectedRoles: ['ORDINARY_USER'] } // Samo za obične korisnike
+    data: { expectedRoles: ['ORDINARY_USER', 'CA_USER'] } 
   },
   {
     path: 'templates',
@@ -84,7 +84,7 @@ const routes: Routes = [
     component: TemplateFormComponent,
     canActivate: [AuthGuard],
     data: { expectedRoles: ['CA_USER'] } 
-
+  },
   {
     path: 'my-requests-history',
     component: CertificateHistoryComponent,
