@@ -1,0 +1,63 @@
+<app-navbar></app-navbar>
+<div class="container">
+  <h2>Zahtevi na čekanju</h2>
+
+  <div *ngIf="isLoading" class="loading-indicator"><p>Učitavanje zahteva...</p></div>
+  <div *ngIf="errorMessage" class="error-message"><p>{{ errorMessage }}</p></div>
+
+  <div *ngIf="!isLoading && !errorMessage">
+    <table class="requests-table" *ngIf="pendingRequests.length > 0; else noRequests">
+      <thead>
+        <tr>
+          <th>ID Zahteva</th>
+          <th>Podnosilac</th>
+          <th>Datum Podnošenja</th>
+          <th>Serijski Broj Izdavaoca</th>
+          <th>Traženi Datum Isteka</th>
+          <th>CSR Podaci</th>
+          <th>Akcije</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- AŽURIRANO: Koristimo request.requester.username -->
+        <tr *ngFor="let request of pendingRequests">
+          <td>{{ request.id }}</td>
+          <td>{{ request.requester.username }}</td>
+          <td>{{ request.createdAt | date:'dd.MM.yyyy HH:mm' }}</td>
+          <td>{{ request.issuerSerialNumber }}</td>
+          <td>{{ request.requestedValidTo | date:'dd.MM.yyyy' }}</td>
+          <td>
+            <button class="btn btn-info" (click)="viewCsrDetails(request)">Prikaži CSR</button>
+          </td>
+          <td>
+            <button class="btn btn-success" (click)="onApprove(request.id)">Odobri</button>
+            <button class="btn btn-danger" (click)="onReject(request.id)">Odbij</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <ng-template #noRequests><p>Trenutno nema zahteva na čekanju.</p></ng-template>
+  </div>
+</div>
+
+<!-- AŽURIRAN MODAL -->
+<div class="modal-overlay" *ngIf="selectedRequest" (click)="closeCsrModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <button class="modal-close-btn" (click)="closeCsrModal()">×</button>
+    <h3>Detalji iz CSR-a</h3>
+    
+    <!-- Prikaz dok se CSR parsira -->
+    <div *ngIf="isParsingCsr">
+      <p>Parsiranje CSR podataka...</p>
+    </div>
+
+    <!-- Prikaz parsiranih podataka -->
+    <div *ngIf="parsedCsrDetails">
+        <p><strong>Common Name (CN):</strong> {{ parsedCsrDetails.commonName }}</p>
+        <p><strong>Organization (O):</strong> {{ parsedCsrDetails.organization }}</p>
+        <p><strong>Organizational Unit (OU):</strong> {{ parsedCsrDetails.organizationalUnit }}</p>
+        <p><strong>Country (C):</strong> {{ parsedCsrDetails.country }}</p>
+        <p><strong>Email:</strong> {{ parsedCsrDetails.email }}</p>
+    </div>
+  </div>
+</div>

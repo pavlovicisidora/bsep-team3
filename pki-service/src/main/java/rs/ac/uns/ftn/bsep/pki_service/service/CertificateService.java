@@ -82,8 +82,8 @@ public class CertificateService {
         return potentialIssuers.stream()
                 .map(cert -> new IssuerDto(
                         cert.getSerialNumber().toString(),
-                        extractFieldFromDn(cert.getSubjectDN(), "CN="),
-                        extractFieldFromDn(cert.getSubjectDN(), "O="),
+                        extractFieldFromDn(cert.getSubjectDN(), "CN"),
+                        extractFieldFromDn(cert.getSubjectDN(), "O"),
                         cert.getValidTo()))
                 .collect(Collectors.toList());
     }

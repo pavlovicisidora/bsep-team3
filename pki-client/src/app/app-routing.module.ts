@@ -13,6 +13,9 @@ import { IntermediateCertificateComponent } from './certificate-management/inter
 import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
 import { TemplateFormComponent } from './template/template-form/template-form.component';
 import { TemplateListComponent } from './template/template-list/template-list.component';
+import { CertificateRequestsComponent } from './certificate-management/certificate-requests/certificate-requests.component';
+import { CertificateHistoryComponent } from './certificate-management/certificate-history/certificate-history.component';
+
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -56,6 +59,14 @@ const routes: Routes = [
     canActivate: [AuthGuard],
     data: { expectedRoles: ['ADMIN', 'CA_USER'] } 
   },
+
+  {
+    path: 'certificate-requests',
+    component: CertificateRequestsComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ADMIN', 'CA_USER'] } // Dostupno za Admina i CA korisnike
+  },
+
   {
     path: 'certificate-request',
     component: EeCertificateComponent,
@@ -73,6 +84,12 @@ const routes: Routes = [
     component: TemplateFormComponent,
     canActivate: [AuthGuard],
     data: { expectedRoles: ['CA_USER'] } 
+
+  {
+    path: 'my-requests-history',
+    component: CertificateHistoryComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ORDINARY_USER'] }
   },
       
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
