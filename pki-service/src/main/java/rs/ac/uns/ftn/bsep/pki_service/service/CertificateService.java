@@ -357,6 +357,18 @@ public class CertificateService {
             X500Name subject = csr.getSubject();
             PublicKey subjectPublicKey = new JcaPKCS10CertificationRequest(csr).getPublicKey();
 
+            try {
+
+                String publicKeyPem = Base64.getEncoder().encodeToString(subjectPublicKey.getEncoded());
+                finalOwner.setPublicKey(publicKeyPem);
+                userRepository.save(finalOwner);
+                log.info("Successfully saved public key for user: {}", finalOwner.getUsername());
+            } catch (Exception e) {
+                log.error("Failed to save public key for user: {}", finalOwner.getUsername(), e);
+                throw new RuntimeException("Failed to save public key for user.", e);
+            }
+
+
             Template template = null;
             if (dto.getTemplateId() != null) {
                 template = templateRepository.findById(dto.getTemplateId())

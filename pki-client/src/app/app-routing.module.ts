@@ -15,7 +15,7 @@ import { TemplateFormComponent } from './template/template-form/template-form.co
 import { TemplateListComponent } from './template/template-list/template-list.component';
 import { CertificateRequestsComponent } from './certificate-management/certificate-requests/certificate-requests.component';
 import { CertificateHistoryComponent } from './certificate-management/certificate-history/certificate-history.component';
-
+import { PasswordViewComponent } from './password-management/password-view/password-view.component';
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -90,6 +90,13 @@ const routes: Routes = [
     component: CertificateHistoryComponent,
     canActivate: [AuthGuard],
     data: { expectedRoles: ['ORDINARY_USER'] }
+  },
+
+  {
+    path: 'password-manager',
+    component: PasswordViewComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ORDINARY_USER'] } 
   },
       
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },

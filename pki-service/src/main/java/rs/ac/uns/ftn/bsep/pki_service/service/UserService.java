@@ -280,4 +280,21 @@ public class UserService {
 
         tokenRepository.delete(verificationToken);
     }
+
+
+    public UserPublicKeyDto getPublicKeyForUser(String username) {
+        log.debug("Fetching public key for user: {}", username);
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> {
+                    log.error("CRITICAL: User not found while fetching public key for username: {}", username);
+                    return new RuntimeException("Authenticated user not found in database.");
+                });
+
+        if (user.getPublicKey() == null || user.getPublicKey().isEmpty()) {
+            log.warn("User {} does not have a public key set.", username);
+            throw new IllegalStateException("User does not have a public key configured.");
+        }
+
+        return new UserPublicKeyDto(user.getPublicKey());
+    }
 }
