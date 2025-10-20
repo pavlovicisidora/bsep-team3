@@ -1,0 +1,93 @@
+/* Importovanje globalnog stila ako je potrebno */
+@import url('../../../styles.css');
+
+/* Glavni kontejner za stranicu - može biti i u globalnom CSS-u */
+.container {
+  max-width: 900px; /* Može biti uži za jednostavnu tabelu */
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Naslov i podnaslov */
+h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+p {
+  text-align: center;
+  color: #777;
+  margin-top: 0;
+  margin-bottom: 2rem;
+}
+
+/* Dugme za kreiranje novog šablona */
+.btn-create {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  padding: 10px 20px;
+  background-color: #673ab7; /* Angular Material ljubičasta */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  text-decoration: none; /* Uklanja podvlačenje ako je link */
+  text-align: center;
+}
+
+.btn-create:hover {
+  background-color: #512da8; /* Tamnija nijansa za hover */
+}
+
+/* Tabela sa šablonima */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table th, table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #ddd; /* Samo donja ivica za čistiji izgled */
+  text-align: left;
+}
+
+table th {
+  background-color: #f5f5f5;
+  color: #333;
+  font-weight: 600; /* Malo deblji font */
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+table tbody tr:hover {
+  background-color: #f0ebf7; /* Vrlo svetla ljubičasta za hover */
+}
+
+/* Poruka kada nema podataka */
+.no-templates-message {
+  text-align: center;
+  padding: 2rem;
+  color: #777;
+}
+
+/* Dugmad za akcije u tabeli */
+.btn-delete {
+  padding: 6px 12px;
+  background-color: #f44336; /* Crvena za brisanje */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.btn-delete:hover {
+  background-color: #d32f2f;
+}

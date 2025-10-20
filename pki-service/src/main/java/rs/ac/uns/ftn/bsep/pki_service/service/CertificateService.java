@@ -27,10 +27,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import rs.ac.uns.ftn.bsep.pki_service.dto.*;
 import rs.ac.uns.ftn.bsep.pki_service.model.CertificateData;
+import rs.ac.uns.ftn.bsep.pki_service.model.Template;
 import rs.ac.uns.ftn.bsep.pki_service.model.User;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.RevocationReason;
 import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
 import rs.ac.uns.ftn.bsep.pki_service.repository.CertificateRepository;
+import rs.ac.uns.ftn.bsep.pki_service.repository.TemplateRepository;
 import rs.ac.uns.ftn.bsep.pki_service.repository.UserRepository;
 import org.bouncycastle.asn1.x509.DistributionPoint;
 import org.bouncycastle.asn1.x509.DistributionPointName;
@@ -57,7 +59,9 @@ public class CertificateService {
     private final CertificateRepository certificateRepository;
     private final KeystoreService keystoreService;
     private final EncryptionService encryptionService;
+    private final TemplateService templateService;
     private final UserRepository userRepository;
+    private final TemplateRepository templateRepository;
 
     public List<IssuerDto> getAvailableIssuers() {
         User currentUser = (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -209,7 +213,11 @@ public class CertificateService {
                 throw new IllegalArgumentException("Issuer certificate not found.");
             }
             CertificateData issuerData = issuerDataOptional.get();
-
+            if (dto.getTemplateId() != null) {
+                Template template = templateRepository.findById(dto.getTemplateId())
+                        .orElseThrow(() -> new IllegalArgumentException("Template not found."));
+                templateService.validateIntermediateCertDtoWithTemplate(template, dto, issuerData);
+            }
             assert currentUser != null;
             if (UserRole.CA_USER.equals(currentUser.getRole()) && !issuerData.getOwner().getId().equals(currentUser.getId())) {
                 log.warn("SECURITY: User {} tried to issue certificate with issuer {} which they do not own.", currentUser.getUsername(), issuerData.getSerialNumber());
@@ -290,6 +298,9 @@ public class CertificateService {
             certData.setAlias(alias);
             certData.setKeystorePassword(encryptedPassword);
             certData.setOwner(owner);
+            if (dto.getTemplateId() != null) {
+                templateRepository.findById(dto.getTemplateId()).ifPresent(certData::setTemplate);
+            }
 
             CertificateData savedCert = certificateRepository.save(certData);
             log.info("AUDIT: Successfully created Intermediate certificate with serial number: {} and alias: {}", savedCert.getSerialNumber(), savedCert.getAlias());
@@ -358,6 +369,13 @@ public class CertificateService {
             }
 
 
+            Template template = null;
+            if (dto.getTemplateId() != null) {
+                template = templateRepository.findById(dto.getTemplateId())
+                        .orElseThrow(() -> new IllegalArgumentException("Template not found."));
+                templateService.validateCsrWithTemplate(template, csr, dto.getValidTo(), issuerData);
+            }
+
             BigInteger serialNumber = new BigInteger(64, new SecureRandom());
             X500Name issuerName = X500Name.getInstance(issuerCertificate.getSubjectX500Principal().getEncoded());
 
@@ -365,8 +383,13 @@ public class CertificateService {
                     issuerName, serialNumber, validFrom, dto.getValidTo(), subject, subjectPublicKey);
 
             certificateBuilder.addExtension(Extension.basicConstraints, true, new BasicConstraints(false));
-            certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+            certificateBuilder.addExtension(Extension.cRLDistributionPoints, false, createCrlDistributionPointsExtension(issuerData.getAlias()));
 
+            if (template != null) {
+                templateService.applyTemplateExtensions(certificateBuilder, template);
+            } else {
+                certificateBuilder.addExtension(Extension.keyUsage, true, new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+            }
             ContentSigner contentSigner = new JcaContentSignerBuilder("SHA256WithRSAEncryption").setProvider("BC").build(issuerPrivateKey);
             X509Certificate certificate = new JcaX509CertificateConverter().setProvider("BC").getCertificate(certificateBuilder.build(contentSigner));
             certificate.verify(issuerCertificate.getPublicKey());
@@ -388,6 +411,9 @@ public class CertificateService {
             certData.setAlias(alias);
             certData.setKeystorePassword("");
             certData.setOwner(finalOwner);
+            if (dto.getTemplateId() != null) {
+                templateRepository.findById(dto.getTemplateId()).ifPresent(certData::setTemplate);
+            }
 
             CertificateData savedCert = certificateRepository.save(certData);
             log.info("AUDIT: Successfully created End-Entity certificate with serial number: {} for owner: {}", savedCert.getSerialNumber(), finalOwner.getUsername());

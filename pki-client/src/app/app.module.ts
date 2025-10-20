@@ -38,6 +38,8 @@ import { IntermediateCertificateComponent } from './certificate-management/inter
 import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
 import { CertificateViewComponent } from './certificate-management/certificate-view/certificate-view.component';
 import { RevokeDialogComponent } from './certificate-management/revoke-dialog/revoke-dialog.component';
+import { TemplateFormComponent } from './template/template-form/template-form.component';
+import { TemplateListComponent } from './template/template-list/template-list.component';
 import { CertificateRequestsComponent } from './certificate-management/certificate-requests/certificate-requests.component';
 import { CertificateHistoryComponent } from './certificate-management/certificate-history/certificate-history.component';
 import { PasswordViewComponent } from './password-management/password-view/password-view.component';
@@ -61,6 +63,8 @@ import { PasswordViewComponent } from './password-management/password-view/passw
     EeCertificateComponent,
     CertificateViewComponent,
     RevokeDialogComponent,
+    TemplateFormComponent,
+    TemplateListComponent,
     CertificateRequestsComponent,
     CertificateHistoryComponent,
     PasswordViewComponent

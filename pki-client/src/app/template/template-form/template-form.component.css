@@ -1,0 +1,116 @@
+/* Importovanje globalnog stila */
+@import url('../../../styles.css');
+
+/* Kontejner i naslov (mogu biti globalni) */
+.container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 2rem;
+}
+
+/* Stil za formu */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem; /* Razmak između grupa polja */
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Labele */
+.form-group label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #555;
+}
+
+/* Input polja i select meni */
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #673ab7; /* Ljubičasta ivica pri fokusu */
+  box-shadow: 0 0 0 2px rgba(103, 58, 183, 0.2);
+}
+
+/* Stil za grupu checkbox-ova */
+.checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Responsivni grid */
+  gap: 1rem;
+  background-color: #f9f9f9;
+  padding: 1rem;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.checkbox-group div {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-group input[type="checkbox"] {
+  margin-right: 0.75rem;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+/* Glavno dugme za submit */
+button[type="submit"] {
+  padding: 12px 20px;
+  background-color: #673ab7; /* Ljubičasta */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 1rem;
+  align-self: flex-end; /* Dugme na desnoj strani */
+}
+
+button[type="submit"]:hover:not(:disabled) {
+  background-color: #512da8;
+}
+
+button[type="submit"]:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Pomoćni tekst ili poruke o grešci (opciono) */
+.form-text {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.25rem;
+}
+
+.error-message {
+  color: #f44336;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
