@@ -13,7 +13,7 @@ import { IntermediateCertificateComponent } from './certificate-management/inter
 import { EeCertificateComponent } from './certificate-management/ee-certificate/ee-certificate.component';
 import { CertificateRequestsComponent } from './certificate-management/certificate-requests/certificate-requests.component';
 import { CertificateHistoryComponent } from './certificate-management/certificate-history/certificate-history.component';
-
+import { PasswordViewComponent } from './password-management/password-view/password-view.component';
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -77,6 +77,13 @@ const routes: Routes = [
     component: CertificateHistoryComponent,
     canActivate: [AuthGuard],
     data: { expectedRoles: ['ORDINARY_USER'] }
+  },
+
+  {
+    path: 'password-manager',
+    component: PasswordViewComponent,
+    canActivate: [AuthGuard],
+    data: { expectedRoles: ['ORDINARY_USER'] } 
   },
       
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },

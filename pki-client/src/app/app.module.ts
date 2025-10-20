@@ -40,6 +40,7 @@ import { CertificateViewComponent } from './certificate-management/certificate-v
 import { RevokeDialogComponent } from './certificate-management/revoke-dialog/revoke-dialog.component';
 import { CertificateRequestsComponent } from './certificate-management/certificate-requests/certificate-requests.component';
 import { CertificateHistoryComponent } from './certificate-management/certificate-history/certificate-history.component';
+import { PasswordViewComponent } from './password-management/password-view/password-view.component';
 
 
 
@@ -61,7 +62,8 @@ import { CertificateHistoryComponent } from './certificate-management/certificat
     CertificateViewComponent,
     RevokeDialogComponent,
     CertificateRequestsComponent,
-    CertificateHistoryComponent
+    CertificateHistoryComponent,
+    PasswordViewComponent
   ],
   imports: [
     BrowserModule,

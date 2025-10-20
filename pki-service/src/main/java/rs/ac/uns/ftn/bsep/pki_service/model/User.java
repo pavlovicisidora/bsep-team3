@@ -12,6 +12,7 @@ import rs.ac.uns.ftn.bsep.pki_service.model.enums.UserRole;
 import java.util.Collection;
 import java.util.Collections;
 
+
 @Entity
 @Table(name = "users")
 @Getter
@@ -49,6 +50,9 @@ public class User implements UserDetails {
 
     @Column(name = "symmetric_key", columnDefinition = "TEXT")
     private String userSymmetricKey;
+
+    @Column(name = "public_key", columnDefinition = "TEXT")
+    private String publicKey;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
