@@ -71,7 +71,7 @@ const routes: Routes = [
     path: 'certificate-request',
     component: EeCertificateComponent,
     canActivate: [AuthGuard],
-    data: { expectedRoles: ['ORDINARY_USER', 'CA_USER'] } 
+    data: { expectedRoles: ['ORDINARY_USER', 'CA_USER', 'ADMIN'] } 
   },
   {
     path: 'templates',

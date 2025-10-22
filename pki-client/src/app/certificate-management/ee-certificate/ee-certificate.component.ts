@@ -1,27 +1,58 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { CertificateManagementService, Issuer } from '../certificate-management.service'; // PAŽNJA: Proverite putanju
+import { Observable, Subscription } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { AuthService } from 'src/app/auth/auth.service';
 
 @Component({
   selector: 'app-ee-certificate',
   templateUrl: './ee-certificate.component.html',
   styleUrls: ['./ee-certificate.component.css']
 })
-export class EeCertificateComponent implements OnInit {
+export class EeCertificateComponent implements OnInit, OnDestroy {
 
   eeCertForm!: FormGroup;
   issuers: Issuer[] = [];
   selectedFile: File | null = null;
   isLoading = true;
 
+  // Observable promenljive za korišćenje u templejtu sa 'async' pipe-om
+  isAdmin$: Observable<boolean>;
+  isCaUser$: Observable<boolean>;
+  isOrdinaryUser$: Observable<boolean>;
+
+  // Nova promenljiva za čuvanje uloge kao string
+  private currentUserRole: string | null = null;
+  // Promenljiva za čuvanje pretplate kako bismo je uništili
+  private userSubscription!: Subscription;
+
   constructor(
     private fb: FormBuilder,
-    private certificateService: CertificateManagementService
-  ) {}
+    private certificateService: CertificateManagementService,
+    private authService: AuthService
+  ) {
+    this.isAdmin$ = this.authService.currentUser$.pipe(map(user => !!user && user.role === 'ADMIN'));
+    this.isCaUser$ = this.authService.currentUser$.pipe(map(user => !!user && user.role === 'CA_USER'));
+    this.isOrdinaryUser$ = this.authService.currentUser$.pipe(map(user => !!user && user.role === 'ORDINARY_USER'));
+  }
 
   ngOnInit(): void {
+    // Pretplata na korisnika kako bismo uvek imali ažurnu ulogu
+    this.userSubscription = this.authService.currentUser$.subscribe(user => {
+      // Čuvamo ulogu u lokalnoj promenljivoj
+      this.currentUserRole = user ? user.role : null;
+    });
+
     this.initializeForm();
     this.loadIssuers();
+  }
+
+  ngOnDestroy(): void {
+    // Obavezno uništiti pretplatu da se izbegne curenje memorije
+    if (this.userSubscription) {
+      this.userSubscription.unsubscribe();
+    }
   }
 
   private initializeForm(): void {
@@ -29,7 +60,6 @@ export class EeCertificateComponent implements OnInit {
       issuerSerialNumber: [null, Validators.required],
       validTo: ['', [Validators.required, this.dateInFutureValidator()]],
     }, {
-      // Validator koji proverava da li je željeni datum isteka pre datuma isteka izdavaoca
       validators: this.issuerExpiryValidator()
     });
   }
@@ -49,7 +79,6 @@ export class EeCertificateComponent implements OnInit {
     });
   }
 
-  // Metoda koja se poziva kada korisnik odabere fajl
   onFileSelected(event: Event): void {
     const element = event.currentTarget as HTMLInputElement;
     let fileList: FileList | null = element.files;
@@ -61,10 +90,8 @@ export class EeCertificateComponent implements OnInit {
   }
 
   onSubmit(): void {
-    // Proveravamo i validnost forme i da li je fajl odabran
     if (this.eeCertForm.invalid || !this.selectedFile) {
       this.eeCertForm.markAllAsTouched();
-      // Možemo dodati i posebnu poruku ako fajl nije odabran
       if (!this.selectedFile) {
         alert('Morate odabrati .csr fajl.');
       }
@@ -74,21 +101,46 @@ export class EeCertificateComponent implements OnInit {
     const formData = this.eeCertForm.value;
     const validToISO = new Date(formData.validTo).toISOString();
 
-    this.certificateService.createCertificateRequest(
-      formData.issuerSerialNumber,
-      validToISO,
-      this.selectedFile
-    ).subscribe({
-      next: (response) => {
-        alert('Zahtev za sertifikat je uspešno poslat!');
-        this.eeCertForm.reset();
-        this.selectedFile = null;
-      },
-      error: (error) => {
-        const errorMessage = error.error?.message || error.message || 'Došlo je do nepoznate greške.';
-        alert(`Greška: ${errorMessage}`);
-      }
-    });
+    // ISPRAVLJENA LOGIKA: Proveravamo vrednost sačuvane uloge
+    if (this.currentUserRole === 'ADMIN' || this.currentUserRole === 'CA_USER') {
+      console.log('Akcija za ADMIN ili CA_USER korisnika.');
+      this.certificateService.createEECertificate(
+          formData.issuerSerialNumber,
+          validToISO,
+          this.selectedFile
+        ).subscribe({
+          next: () => {
+            alert('Uspešno kreiran sertifikat!');
+            this.eeCertForm.reset();
+            this.selectedFile = null;
+          },
+          error: (error) => {
+            const errorMessage = error.error?.message || error.message || 'Došlo je do nepoznate greške.';
+            alert(`Greška: ${errorMessage}`);
+          }
+        });
+    } else if (this.currentUserRole === 'ORDINARY_USER') {
+      console.log('Akcija za ORDINARY_USER korisnika.');
+      this.certificateService.createCertificateRequest(
+          formData.issuerSerialNumber,
+          validToISO,
+          this.selectedFile
+        ).subscribe({
+          next: () => {
+            alert('Zahtev za sertifikat je uspešno poslat!');
+            this.eeCertForm.reset();
+            this.selectedFile = null;
+          },
+          error: (error) => {
+            const errorMessage = error.error?.message || error.message || 'Došlo je do nepoznate greške.';
+            alert(`Greška: ${errorMessage}`);
+          }
+        });
+    } else {
+        // Dobra praksa je obraditi i neočekivane slučajeve
+        alert('Nemate odgovarajuću ulogu za izvršavanje ove akcije.');
+        console.error('Korisnik nema prepoznatu ulogu:', this.currentUserRole);
+    }
   }
 
   // --- VALIDATORI ---
