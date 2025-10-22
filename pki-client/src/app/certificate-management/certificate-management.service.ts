@@ -159,6 +159,24 @@ export class CertificateManagementService {
 }
 
 
+createEECertificate(issuerSerialNumber: string, validTo: string, csrFile: File, templateId?: number | null): Observable<any> {
+    const formData = new FormData();
+    
+    const dto = {
+      issuerSerialNumber: issuerSerialNumber,
+      validTo: validTo,
+      templateId: templateId 
+    };
+    
+    const dtoBlob = new Blob([JSON.stringify(dto)], { type: 'application/json' });
+    
+    formData.append('dto', dtoBlob);
+    formData.append('csrFile', csrFile, csrFile.name);
+    const endpoint = `${this.certApiUrl}/end-entity`;
+    return this.http.post(endpoint, formData);
+}
+
+
 
  getPendingRequests(): Observable<CertificateRequestResponse[]> {
     return this.http.get<CertificateRequestResponse[]>(`${this.requestApiUrl}/pending`);
